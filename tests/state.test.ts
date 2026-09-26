@@ -343,3 +343,16 @@ describe('appearance', () => {
     expect(publicState(setAppearance(s, { species: 'robot', color: 'gold' })!, 0).appearance).toEqual({ species: 'robot', color: 'gold' });
   });
 });
+
+describe('removed pet types', () => {
+  it('a saved fire dragon loads as the mint dragon, keeping its XP and color', async () => {
+    const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+    const { loadState } = await import('../server/store.js');
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pico-')), 'pet.json');
+    fs.writeFileSync(f, JSON.stringify({ ...initialState(), xp: 30, appearance: { species: 'fire', color: 'gold' } }));
+    const s = loadState(f)!;
+    expect(s.xp).toBe(30);
+    expect(s.appearance).toEqual({ species: 'dragon', color: 'gold' });
+    expect(setAppearance(s, { species: 'fire', color: 'gold' })).toBeNull();
+  });
+});

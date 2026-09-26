@@ -36,9 +36,9 @@ const HABITAT_RANGE = 80;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /** The main body hue of each pet type: only pixels near it are recolored. */
-const BODY_HUE: Record<Species, number> = { dragon: 150, fire: 10, cat: 28, robot: 168 };
+const BODY_HUE: Record<Species, number> = { dragon: 150, cat: 28, robot: 168 };
 /** How far from the body hue still counts as body. The robot's recolor is only its teal glow, not its grey-blue metal. */
-const HUE_TOLERANCE: Record<Species, number> = { dragon: 32, fire: 32, cat: 32, robot: 18 };
+const HUE_TOLERANCE: Record<Species, number> = { dragon: 32, cat: 32, robot: 18 };
 
 const shared = new Map<string, Promise<string>>();
 /**

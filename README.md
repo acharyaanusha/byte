@@ -4,7 +4,7 @@
 
 <p align="center"><b>A pixel pet that grows with every little coding breakthrough.</b></p>
 
-<p align="center"><img src="docs/pets.png" width="560" alt="Pico pets: mint dragon, fire dragon, wizard cat and robot"></p>
+<p align="center"><img src="docs/pets.png" width="440" alt="Pico pets: mint dragon, wizard cat and robot"></p>
 
 Pico is a small pixel-art pet (a dragon, a wizard cat or a robot) that floats in an always-on-top overlay above your terminal or coding app, or in a browser window beside it. It watches your
 coding agent through its hooks (**Claude Code, Codex CLI, or Gemini CLI**) and grows when you and your agent hit real coding
@@ -23,7 +23,7 @@ Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn e
 
 ## Make it yours
 
-Pick a **pet type** (mint dragon, fire dragon, wizard cat, robot) and a **color** (original, mint, sky, lavender, rose, ember, gold, black) in the full view's **Your pet** gallery. It shows every pet in your color and your pet's three growth stages, with the ones you haven't reached yet locked. From the overlay, hover over Pico and click **✎**, or right-click → **Pet** / **Color**. Your choice is saved with your pet. Every type has the same three growth stages and the same animations. Colors recolor only the main body hue, so eyes, bellies and accents stay as drawn (for the robot, the color changes its glow).
+Pick a **pet type** (mint dragon, wizard cat, robot) and a **color** (original, mint, sky, lavender, rose, ember, gold, black) in the full view's **Your pet** gallery. It shows every pet in your color and your pet's three growth stages, with the ones you haven't reached yet locked. From the overlay, hover over Pico and click **✎**, or right-click → **Pet** / **Color**. Your choice is saved with your pet. Every type has the same three growth stages and the same animations. Colors recolor only the main body hue, so eyes, bellies and accents stay as drawn (for the robot, the color changes its glow).
 
 The art for each type was generated in Pico's pixel style by `scripts/gen-species.mjs`.
 
@@ -62,7 +62,7 @@ browser (Vite, polls /api/state every second) ◀── .pico/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Pico-0.4.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/pico/releases/latest) and drag Pico to Applications.
+1. Download **Pico-0.4.1-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/pico/releases/latest) and drag Pico to Applications.
 2. The app isn't notarized yet. On first launch, right-click Pico → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Pico.app`.
 3. Pico finds the coding agents on your Mac (Claude Code, Codex, Gemini CLI) and asks to **connect** to them. It adds small hooks to each agent's settings and keeps a backup. Start a new session and Pico follows it. Codex asks you to trust new hooks the first time; approve Pico's.
 That's it: **no API key needed.** Pico asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Pico → **Use my own Jev API key…** to call Jev directly instead.

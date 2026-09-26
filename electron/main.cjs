@@ -158,7 +158,7 @@ function create() {
       { label: 'Use my own Jev API key…', click: keyWindow },
     ] : [];
     const send = (cmd) => () => win.webContents.send('pico:command', cmd);
-    const petMenu = [['dragon', 'Mint dragon'], ['fire', 'Fire dragon'], ['cat', 'Wizard cat'], ['robot', 'Robot']]
+    const petMenu = [['dragon', 'Mint dragon'], ['cat', 'Wizard cat'], ['robot', 'Robot']]
       .map(([id, label]) => ({ label, click: send(`species:${id}`) }));
     const colorMenu = ['original', 'mint', 'sky', 'lavender', 'rose', 'ember', 'gold', 'black']
       .map((c) => ({ label: c[0].toUpperCase() + c.slice(1), click: send(`color:${c}`) }));

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { SPECIES } from '../shared/types.js';
 import type { PetState } from '../shared/types.js';
 import { initialState } from './state.js';
 
@@ -9,6 +10,8 @@ export function loadState(file: string): PetState | null {
     // Evidence saved by an older version has a different shape; the turn simply starts fresh.
     if (saved.currentTurnEvidence && !Array.isArray(saved.currentTurnEvidence.events)) saved.currentTurnEvidence = null;
     delete saved.recentEvents;
+    // A pet type that no longer exists (the fire dragon was removed) falls back to the default.
+    if (saved.appearance && !(SPECIES as readonly string[]).includes(saved.appearance.species)) saved.appearance = { ...saved.appearance, species: 'dragon' };
     return { ...initialState(), ...saved };
   } catch {
     return null;

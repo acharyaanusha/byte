@@ -96,9 +96,9 @@ export interface PetState {
 }
 
 /** Pet types (each has its own frames in public/pet/<species>/) and color presets. */
-export const SPECIES = ['dragon', 'fire', 'cat', 'robot'] as const;
+export const SPECIES = ['dragon', 'cat', 'robot'] as const;
 export type Species = (typeof SPECIES)[number];
-export const SPECIES_LABEL: Record<Species, string> = { dragon: 'Mint dragon', fire: 'Fire dragon', cat: 'Wizard cat', robot: 'Robot' };
+export const SPECIES_LABEL: Record<Species, string> = { dragon: 'Mint dragon', cat: 'Wizard cat', robot: 'Robot' };
 /** Target hue (degrees) for each color preset; "original" keeps the art as drawn; "black" darkens instead of shifting hue. */
 export const COLORS = { original: null, mint: 150, sky: 205, lavender: 270, rose: 335, ember: 12, gold: 45, black: 'black' } as const;
 export type ColorName = keyof typeof COLORS;

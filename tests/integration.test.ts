@@ -97,10 +97,10 @@ describe('appearance endpoint', () => {
     await new Promise<void>((r) => b.server.listen(0, '127.0.0.1', r));
     const port = (b.server.address() as { port: number }).port;
     const post = (body: unknown) => fetch(`http://127.0.0.1:${port}/api/appearance`, { method: 'POST', body: JSON.stringify(body) });
-    expect((await post({ species: 'fire', color: 'rose' })).status).toBe(200);
+    expect((await post({ species: 'cat', color: 'rose' })).status).toBe(200);
     expect((await post({ species: 'dinosaur', color: 'rose' })).status).toBe(400);
     await b.flush();
-    expect(JSON.parse(fs.readFileSync(statePath, 'utf8')).appearance).toEqual({ species: 'fire', color: 'rose' });
+    expect(JSON.parse(fs.readFileSync(statePath, 'utf8')).appearance).toEqual({ species: 'cat', color: 'rose' });
   });
 });
 
