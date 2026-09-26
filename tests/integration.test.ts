@@ -142,7 +142,7 @@ describe('installer', () => {
     expect(once.permissions).toEqual(existing.permissions);
     expect(once.hooks.PostToolUse[0].hooks[0].command).toBe('./mine.sh');
     expect(once.hooks.PostToolUse).toHaveLength(2);
-    expect(Object.keys(once.hooks).sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'SessionStart', 'Stop', 'UserPromptSubmit']);
+    expect(Object.keys(once.hooks).sort()).toEqual(['Notification', 'PostToolUse', 'PostToolUseFailure', 'SessionStart', 'Stop', 'UserPromptSubmit']);
     expect(mergeHooks(once, { hookPath, remove: true })).toEqual(existing);
   });
 });

@@ -1,4 +1,4 @@
-export type EventKind = 'prompt' | 'read' | 'edit' | 'command_ok' | 'command_failed' | 'stop' | 'session_start';
+export type EventKind = 'prompt' | 'read' | 'edit' | 'command_ok' | 'command_failed' | 'stop' | 'session_start' | 'notify';
 
 export interface PetEvent {
   id: string;
@@ -15,6 +15,8 @@ export interface PetEvent {
   checkPassed?: boolean;
   outputExcerpt?: string;
   promptExcerpt?: string;
+  /** Claude Code's Notification text, e.g. "Claude needs your permission to use Bash". */
+  message?: string;
 }
 
 export type Activity = 'exploring' | 'implementing' | 'checking' | 'blocked' | 'resting';
@@ -44,6 +46,9 @@ export interface TurnEvidence {
   verifiedCheck: string | null;
   /** Ids of the events that prove the milestone (failure, edit, pass), kept for Jev even when older than the last 12. */
   trailIds: string[];
+  /** Failures since the last success, per check or command: the loop detector. */
+  failStreaks: Record<string, number>;
+  edits: number;
 }
 
 export type Stage = 'hatchling' | 'sprout' | 'companion';

@@ -49,7 +49,7 @@ export const TAKEOVER_MS = 60_000;
 export function newEvidence(turnId: string, promptExcerpt = ''): TurnEvidence {
   return {
     turnId, promptExcerpt, events: [], version: 0, failed: {}, editSinceLastPass: false, sawEdit: false,
-    recoveredCheck: null, verifiedCheck: null, trailIds: [],
+    recoveredCheck: null, verifiedCheck: null, trailIds: [], failStreaks: {}, edits: 0,
   };
 }
 
@@ -63,7 +63,13 @@ export function deriveEvidence(ev: TurnEvidence): TurnEvidence {
   let editSinceLastPass = false, sawEdit = false, lastEditId = '';
   let recoveredCheck: string | null = null, verifiedCheck: string | null = null;
   let trailIds: string[] = [];
+  const failStreaks: Record<string, number> = {};
+  let edits = 0;
   for (const e of ev.events) {
+    const key = e.check ?? e.command;
+    if (key && e.kind === 'command_failed') failStreaks[key] = (failStreaks[key] ?? 0) + 1;
+    if (key && e.kind === 'command_ok') delete failStreaks[key];
+    if (e.kind === 'edit') edits++;
     if (e.kind === 'edit') {
       sawEdit = true; editSinceLastPass = true; lastEditId = e.id;
       for (const f of Object.values(failed)) if (!f.editedSince) { f.editedSince = true; f.editId = e.id; }
@@ -83,7 +89,7 @@ export function deriveEvidence(ev: TurnEvidence): TurnEvidence {
     }
   }
   const failedOut = Object.fromEntries(Object.entries(failed).map(([k, v]) => [k, { editedSince: v.editedSince }]));
-  return { ...ev, failed: failedOut, editSinceLastPass, sawEdit, recoveredCheck, verifiedCheck, trailIds };
+  return { ...ev, failed: failedOut, editSinceLastPass, sawEdit, recoveredCheck, verifiedCheck, trailIds, failStreaks, edits };
 }
 
 const RELEVANT = new Set(['edit', 'command_failed', 'command_ok']);
@@ -123,6 +129,7 @@ function localBehavior(kind: PetEvent['kind']): [Behavior, string] | null {
     case 'command_failed': return ['puzzled', CAPTIONS.failed];
     case 'command_ok': return ['focused', CAPTIONS.check];
     case 'stop': return ['idle', CAPTIONS.stop];
+    case 'notify': return ['puzzled', CAPTIONS.attention];
     default: return null;
   }
 }
@@ -248,12 +255,64 @@ export function disconnect(state: PetState): PetState {
   return { ...state, activeSessionId: null, currentTurnEvidence: null, behavior: 'idle', caption: CAPTIONS.hello };
 }
 
+export type StatusTone = 'idle' | 'working' | 'stuck' | 'waiting' | 'done' | 'failing';
+export const LOOP_AFTER = 3;
+const QUIET_MS = 90_000;
+
+const mins = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : `${Math.round(ms / 60_000)}m`);
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * A one-line, fixed-template summary of how the followed session is going:
+ * working (with counts), looping, waiting on you, or how the turn ended.
+ */
+export function sessionStatus(state: PetState, now: number): { tone: StatusTone; text: string } {
+  const ev = state.currentTurnEvidence;
+  if (!state.activeSessionId) return { tone: 'idle', text: 'Not following a Claude session yet.' };
+  if (!ev || ev.events.length === 0) return { tone: 'idle', text: 'Connected. Waiting for your prompt.' };
+
+  const last = ev.events[ev.events.length - 1];
+  const ended = last.kind === 'stop';
+  const streaks = Object.entries(ev.failStreaks ?? {}).sort((x, y) => y[1] - x[1]);
+  const failing = streaks.map(([k]) => k).filter((k) => ev.failed[k]);
+  const judged = state.lastJudgment?.turnId === ev.turnId ? state.lastJudgment : null;
+
+  if (last.kind === 'notify') return { tone: 'waiting', text: `Needs you: ${last.message || 'Claude is waiting for your input.'}` };
+  const loop = streaks.find(([, n]) => n >= LOOP_AFTER);
+  if (loop && !ended) return { tone: 'stuck', text: `Looping? “${loop[0]}” failed ${loop[1]}× in a row.` };
+  if (judged && judged.needsAttention >= MIN_PROBABILITY) return { tone: 'waiting', text: 'Claude may be waiting on you.' };
+  if (judged?.activity === 'blocked' && !ended) return { tone: 'stuck', text: 'Looks blocked. Might need a nudge.' };
+
+  if (ended) {
+    if (ev.recoveredCheck) return { tone: 'done', text: `Done: fixed ${ev.recoveredCheck} and it passes ✓` };
+    if (ev.verifiedCheck) return { tone: 'done', text: `Done: changes verified by ${ev.verifiedCheck} ✓` };
+    if (failing.length) return { tone: 'failing', text: `Finished, but ${failing[0]} is still failing.` };
+    if (loop) return { tone: 'failing', text: `Finished after “${loop[0]}” failed ${loop[1]}×.` };
+    if (ev.edits) return { tone: 'done', text: `Finished: ${plural(ev.edits, 'edit')}, not verified by a check.` };
+    return { tone: 'done', text: 'Finished. Just looked around this time.' };
+  }
+
+  const quiet = now - last.timestamp;
+  if (quiet > QUIET_MS) return { tone: 'working', text: `Quiet for ${mins(quiet)}. A long-running command?` };
+  const phase = last.kind === 'read' ? 'Exploring'
+    : last.kind === 'edit' ? 'Editing'
+    : last.kind === 'command_ok' || last.kind === 'command_failed' ? (last.check ? 'Running checks' : 'Running commands')
+    : 'Thinking';
+  const parts = [phase];
+  if (ev.edits) parts.push(plural(ev.edits, 'edit'));
+  if (failing.length) parts.push(`${failing[0]} failing`);
+  else if (ev.recoveredCheck || ev.verifiedCheck) parts.push('checks passing ✓');
+  parts.push(mins(now - ev.events[0].timestamp));
+  return { tone: failing.length ? 'failing' : 'working', text: parts.join(' · ') };
+}
+
 /** What the browser sees: no dedup bookkeeping, no raw event outputs. */
 export function publicState(state: PetState, now: number) {
   const { seenEventIds, awardedTurnIds, pastTurnIds, currentTurnEvidence, ...rest } = state;
   return {
     ...rest,
     now,
+    status: sessionStatus(state, now),
     turn: currentTurnEvidence && {
       turnId: currentTurnEvidence.turnId,
       sawEdit: currentTurnEvidence.sawEdit,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyJudgment, initialState, jevEvents, reduceEvent, stageFor, TAKEOVER_MS } from '../server/state.js';
+import { applyJudgment, initialState, jevEvents, reduceEvent, sessionStatus, stageFor, TAKEOVER_MS } from '../server/state.js';
 import { buildState } from '../server/jev.js';
 import { canonicalCheck, looksPassing, normalizeHook } from '../server/claude.js';
 import type { EventKind, PetEvent, PetJudgment, PetState } from '../shared/types.js';
@@ -213,5 +213,36 @@ describe('review findings', () => {
   it('uses the hook-stamped time when present', () => {
     const e = normalizeHook({ ...(fixtures as Record<string, unknown>[])[1], hook_ts: 42 }, 999);
     expect(e!.timestamp).toBe(42);
+  });
+});
+
+describe('session status', () => {
+  const at = (s: PetState) => sessionStatus(s, s.lastEventAt + 1000);
+  it('reports work in progress with counts', () => {
+    const st = at(run([ev('prompt'), ev('edit'), failTest()]));
+    expect(st.tone).toBe('failing');
+    expect(st.text).toMatch(/Running checks · 1 edit · npm test failing/);
+  });
+  it('flags a loop when the same check keeps failing', () => {
+    const st = at(run([ev('prompt'), failTest(), ev('edit'), failTest(), ev('edit'), failTest()]));
+    expect(st.tone).toBe('stuck');
+    expect(st.text).toContain('npm test” failed 3×');
+  });
+  it('a pass resets the loop counter', () => {
+    const st = at(run([ev('prompt'), failTest(), failTest(), passTest(), failTest()]));
+    expect(st.tone).not.toBe('stuck');
+  });
+  it('says when Claude needs you (Notification hook)', () => {
+    const st = at(run([ev('prompt'), ev('notify', { message: 'Claude needs your permission to use Bash' })]));
+    expect(st).toEqual({ tone: 'waiting', text: 'Needs you: Claude needs your permission to use Bash' });
+  });
+  it('summarizes how the turn ended', () => {
+    expect(at(run([ev('prompt'), failTest(), ev('edit'), passTest(), ev('stop')])).text).toBe('Done: fixed npm test and it passes ✓');
+    expect(at(run([ev('prompt'), ev('edit'), failTest(), ev('stop')]))).toEqual({ tone: 'failing', text: 'Finished, but npm test is still failing.' });
+    expect(at(run([ev('prompt'), ev('read'), ev('stop')])).text).toBe('Finished. Just looked around this time.');
+  });
+  it('normalizes the Notification hook', () => {
+    const e = normalizeHook({ session_id: 's', prompt_id: 'p', hook_event_name: 'Notification', message: 'Claude is waiting for your input' });
+    expect(e).toMatchObject({ kind: 'notify', message: 'Claude is waiting for your input' });
   });
 });

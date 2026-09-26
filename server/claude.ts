@@ -67,6 +67,10 @@ export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null
     kind = 'prompt';
     extra.promptExcerpt = scrub(head(str(raw.prompt) ?? ''));
   } else if (hook === 'Stop') kind = 'stop';
+  else if (hook === 'Notification') {
+    kind = 'notify';
+    extra.message = scrub(head(str(raw.message) ?? '', 160));
+  }
   else if (hook === 'PostToolUse' || hook === 'PostToolUseFailure') {
     if (!toolName) return null;
     if (READ_TOOLS.has(toolName)) kind = 'read';

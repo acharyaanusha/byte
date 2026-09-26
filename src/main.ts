@@ -6,10 +6,14 @@ import { startReplay } from './replay.js';
 import { PetAnimator } from './pet.js';
 
 const overlay = new URLSearchParams(location.search).has('overlay');
-if (overlay) document.documentElement.classList.add('overlay');
+if (overlay) {
+  document.documentElement.classList.add('overlay');
+  document.getElementById('demo-banner')!.textContent = 'Demo · simulated';
+}
 
 const SLEEP_AFTER_MS = 90_000;
 const HOLD_MS = 3000;
+const REACTION_MS = 2500;
 const THRESHOLDS: Record<Stage, [number, number | null, string | null]> = {
   hatchling: [0, 20, 'sprout'],
   sprout: [20, 50, 'companion'],
@@ -101,6 +105,7 @@ function render() {
   const s = latest;
   const replaying = !!stopReplay;
   el.demoBanner.hidden = !replaying;
+  el.stageMini.classList.toggle('demo', replaying);
   el.replay.textContent = replaying ? 'Exit demo' : 'Replay demo';
   el.disconnect.disabled = replaying;
 
@@ -120,7 +125,7 @@ function render() {
   // Stage + growth flash
   if (shownStage !== s.stage) {
     animator.setStage(s.stage);
-    el.stage.textContent = el.stageMini.textContent = s.stage[0].toUpperCase() + s.stage.slice(1);
+    el.stage.textContent = s.stage[0].toUpperCase() + s.stage.slice(1);
     if (shownStage && s.grewAt > lastGrewAt) {
       el.pet.classList.remove('grow'); void el.pet.offsetWidth; el.pet.classList.add('grow');
       el.flash.classList.remove('on'); void el.flash.offsetWidth; el.flash.classList.add('on');
@@ -140,11 +145,16 @@ function render() {
   const j = s.lastJudgment;
   animator.setAttention(!!j && j.needsAttention >= 0.8 && now - j.at < 30_000 && now >= s.celebrateUntil);
 
-  // Caption
+  // Caption: a quick reaction right after something happens, otherwise how the session is going.
+  const reacting = now - s.lastEventAt < REACTION_MS || now < s.celebrateUntil;
+  const tone = now < petCaptionUntil || reacting ? 'reaction' : s.status.tone;
+  el.caption.dataset.tone = tone;
   el.caption.textContent = now < petCaptionUntil ? CAPTIONS.pet
-    : shown === 'sleeping' ? 'Zzz… (no activity for a bit)'
-    : s.activeSessionId || replaying ? s.caption
-    : 'Start Claude Code in your repo. I’ll follow along.';
+    : reacting ? s.caption
+    : s.status.tone === 'idle' && shown === 'sleeping' ? 'Zzz… (no activity for a bit)'
+    : s.status.text;
+
+  el.stageMini.textContent = replaying ? `Demo · ${el.stage.textContent}` : el.stage.textContent;
 
   // XP
   const [lo, hi, nextStage] = THRESHOLDS[s.stage];
@@ -204,8 +214,6 @@ function toggleReplay() {
 el.replay.addEventListener('click', toggleReplay);
 window.byteHost?.onCommand?.((cmd) => {
   if (cmd === 'replay') toggleReplay();
-  if (cmd === 'fall-start') animator.falling = true;
-  if (cmd === 'fall-end') animator.falling = false;
 });
 
 function exitReplay() {

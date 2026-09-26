@@ -154,23 +154,35 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 html.overlay, html.overlay body { background: transparent; }
 html.overlay .app { background: transparent; min-height: 0; max-width: none; height: 100vh; padding: 0 8px 6px; gap: 2px; justify-content: flex-end; overflow: hidden; }
 html.overlay .top, html.overlay .milestones, html.overlay .details, html.overlay .actions, html.overlay #other-banner { display: none !important; }
-html.overlay .banner.demo { font-size: 10px; padding: 3px 6px; order: -2; }
+/* In the overlay the demo label lives in the XP pill (see .stage.mini.demo). */
+html.overlay .banner.demo { display: none !important; }
+html.overlay .stage.mini.demo { background: #2c3a36; color: #fdf7e6; }
 html.overlay .caption {
-  order: -1; position: relative; align-self: center; min-height: 0; max-width: 230px;
-  font-size: 12.5px; padding: 6px 10px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
+  order: -1; position: relative; align-self: center; min-height: 0; max-width: 204px; flex: none;
+  font-size: 11.5px; line-height: 1.3; padding: 5px 9px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
   cursor: grab; box-shadow: 0 2px 0 #2c3a36; user-select: none;
 }
 html.overlay .caption::after {
   content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px;
   background: #fffdf7; border-right: 1.5px solid #2c3a36; border-bottom: 1.5px solid #2c3a36; transform: rotate(45deg);
 }
-html.overlay .habitat { height: 150px; flex: none; background: none; border: 0; overflow: visible; }
+html.overlay .habitat { height: 112px; flex: none; background: none; border: 0; overflow: visible; }
 html.overlay .sun, html.overlay .hill, html.overlay .flash { display: none; }
-html.overlay .pet { width: 225px; height: 150px; margin-left: -112px; bottom: 0; }
-html.overlay .pet img { width: 225px; height: 150px; }
-html.overlay .shadow { bottom: 6px; width: 70px; margin-left: -35px; }
+html.overlay .pet { width: 168px; height: 112px; margin-left: -84px; bottom: 0; }
+html.overlay .pet img { width: 168px; height: 112px; }
+html.overlay .shadow { bottom: 4px; width: 54px; margin-left: -27px; }
 html.overlay .xp { display: flex; align-items: center; gap: 6px; cursor: grab; user-select: none; background: #fffdf7e6; border: 1.5px solid #2c3a36; border-radius: 99px; padding: 3px 8px; }
 html.overlay .xp-row { margin: 0; font-size: 11px; order: 2; }
 html.overlay .xp-row span { display: none; }
 html.overlay .bar { flex: 1; height: 7px; order: 1; }
 html.overlay .stage.mini { display: inline; font-size: 9.5px; padding: 1px 6px; order: 0; }
+
+/* Session status tones: a colored edge on the bubble says how it's going at a glance. */
+.app .caption[data-tone] { border-left-width: 5px; }
+.app .caption[data-tone='working'] { border-left-color: var(--mint-deep); }
+.app .caption[data-tone='done'] { border-left-color: #3fb67d; }
+.app .caption[data-tone='failing'] { border-left-color: var(--gold); }
+.app .caption[data-tone='stuck'] { border-left-color: #e0823d; }
+.app .caption[data-tone='waiting'] { border-left-color: var(--rose); }
+.caption[data-tone='reaction'], .caption[data-tone='idle'] { border-left-width: 1px; }
+html.overlay .caption[data-tone='reaction'], html.overlay .caption[data-tone='idle'] { border-left-width: 1.5px; }

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), 'claude-hook.mjs');
 const MARKER = 'claude-hook.mjs';
-const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'Stop'];
+const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'Notification'];
 const TOOL_EVENTS = new Set(['PostToolUse', 'PostToolUseFailure']);
 
 export function isByteHook(h) {

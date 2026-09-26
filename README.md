@@ -33,7 +33,8 @@ Claude Code ──hooks──▶ scripts/claude-hook.mjs ──POST /events (300
 browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic writes)
 ```
 
-- **Behaviors (frame-animated):** Byte walks with a 4-frame cycle (contact, passing, contact, passing). It only moves forward on the contact frames, bobbing up on the passing ones, so its steps look planted. When idle it mixes standing, blinking, looking around, sitting and short strolls. It turns around before changing direction. While your agent works (focused) it paces more. It scratches its head after a failed check, jumps when it earns XP, and curls up after 90 s with no activity. When Jev thinks you're needed, it runs to the middle of the screen and waves. Clicking Byte makes it wave. In the overlay Byte stands on the bottom of the screen, just above the Dock. Drop it mid-air and it falls back down with a small bounce. Growing to a new stage adds a flash and a scale pop.
+- **Behaviors (frame-animated):** Byte walks with a 4-frame cycle (contact, passing, contact, passing). It only moves forward on the contact frames, bobbing up on the passing ones, so its steps look planted. When idle it mixes standing, blinking, looking around, sitting and short strolls. It turns around before changing direction. While your agent works (focused) it paces more. It scratches its head after a failed check, jumps when it earns XP, and curls up after 90 s with no activity. When Claude needs you, it stops and waves. Clicking Byte makes it wave. In the overlay Byte stays wherever you drop it and only wanders a short way around that spot. Growing to a new stage adds a flash and a scale pop.
+- **Session status:** the speech bubble says how the followed session is going, using fixed templates. It shows what Claude is doing, with edit counts, failing checks and elapsed time. It warns *Looping?* when the same check or command fails 3× in a row, and says *Needs you* when Claude Code's Notification hook fires (a permission prompt or waiting for input) or Jev thinks you're needed. When the turn ends, it says whether it finished fixed, verified, or still failing. A colored edge shows the tone at a glance. Reactions such as "That check needs another try." flash for a moment in between.
 - **Turns:** each event's Claude Code `prompt_id` is its turn ID. A Jev reply for an older turn is ignored, so it can't award XP to a newer one.
 - **Superseded replies:** each turn's evidence has a version. If new evidence lands while Jev is thinking, that reply is dropped and the current evidence is judged next.
 - **Out-of-order hooks:** async hooks can arrive out of order, so the hook stamps each event when Claude Code runs it. The server re-derives the turn's evidence in that order. A tool event that beats its prompt still opens the turn.
@@ -76,7 +77,7 @@ Restart Claude Code afterwards (running sessions may also pick the hooks up live
 
 **Remove:** `npm run install-hooks -- --global --remove` or `npm run install-hooks -- /path/to/your/repo --remove` (or restore the `.byte-backup-*` file).
 
-The hooks are `async` command hooks for SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure and Stop.
+The hooks are `async` command hooks for SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop and Notification.
 The tool hooks only match Read, Grep, Glob, Edit, Write and Bash. The hook script always exits 0 and writes nothing to stdout, even when the Byte server isn't running.
 
 ### Sessions
