@@ -3,10 +3,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createByte } from '../server/index.js';
+import { createByte, resolveProxy } from '../server/index.js';
 import { isByteHook, mergeHooks } from '../scripts/install-hooks.mjs';
 
-export { createByte };
+export { createByte, resolveProxy };
 
 export const BYTE_HOME = path.join(os.homedir(), '.byte');
 const CONFIG = path.join(BYTE_HOME, 'config.json');

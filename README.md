@@ -44,12 +44,16 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Byte-0.1.1-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+1. Download **Byte-0.1.2-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
 2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
 3. Byte asks to **connect to Claude Code**. It adds small async hooks to `~/.claude/settings.json` and keeps a backup. Start a new Claude Code session and Byte follows it.
-4. Right-click Byte → **Set Jev API key…** and paste your [TypeSafe](https://docs.typesafe.ai) key. Without a key, Byte still reacts but awards no XP.
+That's it: **no API key needed.** Byte asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Byte → **Use my own Jev API key…** to call Jev directly instead.
 
-Everything runs locally: the app hosts Byte's server on `127.0.0.1:4317`, keeps your pet in `~/.byte/pet.json` and your key in `~/.byte/config.json` (readable only by you). The hooks run with the app's own runtime, so you don't need Node. To disconnect, use right-click → **Disconnect Claude Code**.
+Byte runs locally: the app hosts Byte's server on `127.0.0.1:4317` and keeps your pet in `~/.byte/pet.json` (and your own key, if you add one, in `~/.byte/config.json`, readable only by you). The hooks run with the app's own runtime, so you don't need Node. To disconnect, use right-click → **Disconnect Claude Code**.
+
+### The shared Jev service
+
+Without your own key, Byte sends each judgment request to `https://byte-jev.vercel.app/api/judge` (`proxy/handler.ts`, `api/judge.ts`). The request is the same bounded summary described above: a prompt excerpt, command names, and output tails, at most 8 KB, with file contents and anything that looks like a secret left out. The service adds Byte's three fixed questions, asks Jev, and returns the typed answer. Nothing is stored. It only answers those three questions, and it's rate-limited per address (12 a minute; Byte itself asks at most once every 10 seconds). Set `BYTE_JEV_PROXY=off` to turn it off, or point it at your own deployment of this repo (set `TYPESAFE_API_KEY` in Vercel).
 
 ## Develop from source
 

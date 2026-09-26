@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeHook } from './claude.js';
-import { judge } from './jev.js';
+import { DEFAULT_PROXY_URL, judge } from './jev.js';
 import { JudgeScheduler } from './scheduler.js';
 import { applyJudgment, disconnect, initialState, markDegraded, publicState, reduceEvent } from './state.js';
 import { loadState, Store } from './store.js';
@@ -15,6 +15,8 @@ export interface ByteOptions {
   judgeImpl?: typeof judge;
   schedule?: { debounceMs: number; cooldownMs: number };
   log?: (msg: string) => void;
+  /** Shared Jev proxy used when there is no personal key; undefined disables it. */
+  proxyUrl?: string;
   /** Serve the built UI from this directory (the packaged app); dev uses Vite instead. */
   staticDir?: string;
 }
@@ -31,8 +33,9 @@ export function createByte(opts: ByteOptions) {
   const store = new Store(opts.statePath);
   let state: PetState = loadState(opts.statePath) ?? initialState();
   let apiKey = opts.apiKey;
+  const canJudge = () => !!apiKey || !!opts.proxyUrl;
   // Connection is a property of this run, not of the saved pet.
-  state = apiKey ? { ...state, connection: 'waiting' } : markDegraded(state);
+  state = canJudge() ? { ...state, connection: 'waiting' } : markDegraded(state);
   const set = (next: PetState) => { state = next; store.save(state); };
 
   const scheduler = new JudgeScheduler(async () => {
@@ -41,10 +44,10 @@ export function createByte(opts: ByteOptions) {
     // Captured now: a late reply must not touch a newer turn or newer evidence in this turn.
     const turnId = ev.turnId;
     const version = ev.version;
-    if (!apiKey) { set(markDegraded(state)); return; }
+    if (!canJudge()) { set(markDegraded(state)); return; }
     let judgment: PetJudgment;
     try {
-      judgment = await (opts.judgeImpl ?? judge)(ev, { apiKey });
+      judgment = await (opts.judgeImpl ?? judge)(ev, { apiKey, proxyUrl: opts.proxyUrl });
     } catch (err) {
       log(`jev failed turn=${turnId}: ${(err as Error).name}: ${(err as Error).message}`);
       set(markDegraded(state));
@@ -102,12 +105,18 @@ export function createByte(opts: ByteOptions) {
     /** Set or clear the Jev key at runtime (the app's "Set Jev API key…" menu). */
     setApiKey: (key: string | undefined) => {
       apiKey = key || undefined;
-      set(apiKey ? { ...state, connection: 'waiting' } : markDegraded(state));
+      set(canJudge() ? { ...state, connection: 'waiting' } : markDegraded(state));
     },
     getState: () => state,
     flush: () => store.flush(),
     close: async () => { scheduler.stop(); await store.flush(); await new Promise<void>((r) => server.close(() => r())); },
   };
+}
+
+/** BYTE_JEV_PROXY: unset → the shared proxy, "off" → none, anything else → that URL. */
+export function resolveProxy(env: string | undefined): string | undefined {
+  if (env === 'off') return undefined;
+  return env || DEFAULT_PROXY_URL;
 }
 
 function serveStatic(dir: string, reqUrl: string, res: http.ServerResponse) {
@@ -127,8 +136,9 @@ if (import.meta.url && process.argv[1] && path.resolve(process.argv[1]) === file
   if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
   const port = Number(process.env.BYTE_PORT ?? 4317);
   const apiKey = process.env.TYPESAFE_API_KEY || undefined;
-  const byte = createByte({ statePath: path.join(root, '.byte', 'pet.json'), apiKey });
+  const proxyUrl = resolveProxy(process.env.BYTE_JEV_PROXY);
+  const byte = createByte({ statePath: path.join(root, '.byte', 'pet.json'), apiKey, proxyUrl });
   byte.server.listen(port, '127.0.0.1', () => {
-    console.log(`[byte] listening on http://127.0.0.1:${port}  jev=${apiKey ? 'configured' : 'NO KEY (degraded)'}`);
+    console.log(`[byte] listening on http://127.0.0.1:${port}  jev=${apiKey ? 'own key' : proxyUrl ? `shared proxy ${proxyUrl}` : 'OFF (degraded)'}`);
   });
 }

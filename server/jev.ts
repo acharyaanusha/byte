@@ -71,7 +71,11 @@ export function buildQuestions() {
 }
 
 type Fetch = typeof fetch;
-export interface JudgeOptions { apiKey: string; timeoutMs?: number; fetchImpl?: Fetch }
+/** A personal key calls TypeSafe directly; otherwise the shared proxy asks the same questions for you. */
+export interface JudgeOptions { apiKey?: string; proxyUrl?: string; timeoutMs?: number; fetchImpl?: Fetch }
+
+/** Byte's shared Jev proxy (proxy/handler.ts deployed on Vercel). */
+export const DEFAULT_PROXY_URL = 'https://byte-jev.vercel.app/api/judge';
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null);
 
@@ -95,13 +99,31 @@ export function parseJudgment(body: unknown): PetJudgment {
 /** One batched Jev request: three independent questions over the same bounded summary. */
 export async function judge(evidence: TurnEvidence, opts: JudgeOptions): Promise<PetJudgment> {
   const started = Date.now();
-  const res = await (opts.fetchImpl ?? fetch)(JEV_URL, {
+  const f = opts.fetchImpl ?? fetch;
+  if (opts.apiKey) {
+    const res = await f(JEV_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: JEV_MODEL, state: buildState(evidence), questions: buildQuestions() }),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
+    });
+    if (!res.ok) throw new Error(`Jev HTTP ${res.status}`);
+    return { ...parseJudgment(await res.json()), latencyMs: Date.now() - started };
+  }
+  if (!opts.proxyUrl) throw new Error('No Jev key or proxy configured');
+  // The proxy returns the validated judgment itself; re-validate it here anyway.
+  const res = await f(opts.proxyUrl, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: JEV_MODEL, state: buildState(evidence), questions: buildQuestions() }),
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state: buildState(evidence) }),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 6000),
   });
-  if (!res.ok) throw new Error(`Jev HTTP ${res.status}`);
-  const judgment = parseJudgment(await res.json());
+  if (!res.ok) throw new Error(`Jev proxy HTTP ${res.status}`);
+  const j = (await res.json()) as Record<string, unknown>;
+  const judgment = parseJudgment({ answers: {
+    activity: { choice: j.activity },
+    milestone: { choice: j.milestone, probabilities: { [String(j.milestone)]: j.milestoneProbability } },
+    needs_attention: { noul: j.needsAttention },
+  } });
   return { ...judgment, latencyMs: Date.now() - started };
 }

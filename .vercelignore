@@ -1,0 +1,10 @@
+release/
+.byte/
+node_modules/
+dist/
+build/
+electron/
+tests/
+fixtures/
+public/pet/
+.env

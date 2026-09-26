@@ -31,6 +31,7 @@ function startServer() {
   byte = backend.createByte({
     statePath: path.join(backend.BYTE_HOME, 'pet.json'),
     apiKey: process.env.TYPESAFE_API_KEY || config.typesafeApiKey,
+    proxyUrl: backend.resolveProxy(process.env.BYTE_JEV_PROXY),
     staticDir: path.join(__dirname, '..', 'dist'),
     log: () => {},
   });
@@ -72,7 +73,7 @@ function keyWindow() {
   });
   const html = `<!doctype html><meta charset="utf-8"><title>Jev API key</title>
 <body style="font:14px -apple-system,system-ui;margin:18px;color:#2c3a36;background:#fbf5e6">
-<p style="margin:0 0 10px">Byte uses <b>Jev</b> (TypeSafe) to decide milestones. Paste your TypeSafe API key. It is stored only on this Mac, in ~/.byte/config.json.</p>
+<p style="margin:0 0 10px">Optional. Byte already uses a shared <b>Jev</b> service. Paste your own TypeSafe API key to call Jev directly instead. It is stored only on this Mac, in ~/.byte/config.json. Leave empty to go back to the shared service.</p>
 <form id="f"><input id="k" type="password" placeholder="TypeSafe API key" autofocus style="width:100%;padding:8px;box-sizing:border-box;border:1px solid #cdbf9c;border-radius:8px">
 <p style="text-align:right;margin:12px 0 0"><button type="submit" style="padding:7px 14px;border-radius:8px;border:0;background:#3e9d78;color:#fff;font-weight:600">Save</button></p></form>
 <script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();await window.byteHost.saveKey(document.getElementById('k').value.trim());window.close();};</script>`;
@@ -109,7 +110,7 @@ function create() {
       backend.hooksInstalled()
         ? { label: 'Disconnect Claude Code (remove hooks)', click: () => setHooks(false) }
         : { label: 'Connect Claude Code (install hooks)', click: () => setHooks(true) },
-      { label: 'Set Jev API key…', click: keyWindow },
+      { label: 'Use my own Jev API key…', click: keyWindow },
     ] : [];
     Menu.buildFromTemplate([
       { label: 'Open full view', click: () => shell.openExternal(UI) },
