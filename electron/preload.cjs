@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('byteHost', {
   dragEnd: () => ipcRenderer.send('byte:dragEnd'),
   saveKey: (key) => ipcRenderer.invoke('byte:saveKey', key),
   answer: (i) => ipcRenderer.send('byte:answer', i),
+  openFullView: () => ipcRenderer.send('byte:openFull'),
 });

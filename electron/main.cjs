@@ -175,6 +175,8 @@ function create() {
   });
 }
 
+ipcMain.on('byte:openFull', () => { void shell.openExternal(`${UI}#gallery`); });
+
 ipcMain.on('byte:interactive', (_e, on) => {
   if (win) win.setIgnoreMouseEvents(!on, { forward: true });
 });

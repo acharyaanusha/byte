@@ -4,7 +4,7 @@ import type { PublicState } from '../server/state.js';
 import { COLORS, SPECIES, SPECIES_LABEL } from '../shared/types.js';
 import type { Appearance, Behavior, ColorName, MilestoneRecord, PetState, Species, Stage } from '../shared/types.js';
 import { startReplay } from './replay.js';
-import { PetAnimator } from './pet.js';
+import { frameUrl, PetAnimator } from './pet.js';
 
 const overlay = new URLSearchParams(location.search).has('overlay');
 if (overlay) {
@@ -32,7 +32,7 @@ const el = {
   milestones: $('milestones'), details: $('details-body'), hearts: $('hearts'), flash: $('flash'),
   replay: $<HTMLButtonElement>('replay'), disconnect: $<HTMLButtonElement>('disconnect'),
   demoBanner: $('demo-banner'), otherBanner: $('other-banner'), stageMini: $('stage-mini'), flip: $('flip'), connMini: $('conn-mini'),
-  species: $<HTMLSelectElement>('species'), color: $<HTMLSelectElement>('color'),
+  speciesGrid: $('species-grid'), swatches: $('swatches'), stages: $('stages'), customizeBtn: $<HTMLButtonElement>('customize-btn'),
 };
 
 const pageStart = Date.now();
@@ -138,8 +138,7 @@ function render() {
   // Appearance (the demo replay keeps whatever you picked)
   const look = s.appearance ?? { species: 'dragon', color: 'original' };
   animator.setAppearance(look.species, look.color);
-  if (document.activeElement !== el.species) el.species.value = look.species;
-  if (document.activeElement !== el.color) el.color.value = look.color;
+  renderGallery(look, s.stage);
 
   // Stage + growth flash
   if (shownStage !== s.stage) {
@@ -243,8 +242,72 @@ function toggleReplay() {
 }
 el.replay.addEventListener('click', toggleReplay);
 // Customize: type and color are saved with the pet on the server.
-for (const sp of SPECIES) el.species.add(new Option(SPECIES_LABEL[sp], sp));
-for (const c of Object.keys(COLORS)) el.color.add(new Option(c[0].toUpperCase() + c.slice(1), c));
+const STAGES: Stage[] = ['hatchling', 'sprout', 'companion'];
+const STAGE_XP: Record<Stage, number> = { hatchling: 0, sprout: 20, companion: 50 };
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+/** Swatch fill: the preset's hue, or the pet's own look for "original". */
+const SWATCH: Record<ColorName, string> = {
+  original: 'conic-gradient(#7fd6b0 0 25%, #e8643c 0 50%, #f0a24a 0 75%, #9fb3c8 0)',
+  mint: 'hsl(150 55% 55%)', sky: 'hsl(205 70% 60%)', lavender: 'hsl(270 55% 68%)',
+  rose: 'hsl(335 65% 68%)', ember: 'hsl(12 75% 55%)', gold: 'hsl(45 85% 55%)',
+};
+
+function thumb(species: Species, color: ColorName, stage: Stage, alt: string): HTMLImageElement {
+  const img = new Image(96, 64);
+  img.alt = alt;
+  img.decoding = 'async';
+  void frameUrl(species, color, stage).then((u) => { img.src = u; });
+  return img;
+}
+
+// Built once; renderGallery only updates what changed.
+let galleryKey = '';
+for (const sp of SPECIES) {
+  const b = document.createElement('button');
+  b.className = 'species-card';
+  b.dataset.species = sp;
+  b.setAttribute('role', 'radio');
+  b.append(document.createElement('span'));
+  const label = document.createElement('small');
+  label.textContent = SPECIES_LABEL[sp];
+  b.append(label);
+  b.addEventListener('click', () => void saveAppearance({ species: sp }));
+  el.speciesGrid.append(b);
+}
+for (const c of Object.keys(COLORS) as ColorName[]) {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.dataset.color = c;
+  b.title = cap(c);
+  b.setAttribute('role', 'radio');
+  b.setAttribute('aria-label', cap(c));
+  b.style.background = SWATCH[c];
+  b.addEventListener('click', () => void saveAppearance({ color: c }));
+  el.swatches.append(b);
+}
+
+/** The gallery: every pet in your color, the swatches, and your pet's three stages (locked ones dimmed). */
+function renderGallery(look: Appearance, stage: Stage) {
+  const key = `${look.species}|${look.color}|${stage}`;
+  if (key === galleryKey) return;
+  galleryKey = key;
+  for (const card of el.speciesGrid.querySelectorAll<HTMLButtonElement>('.species-card')) {
+    const sp = card.dataset.species as Species;
+    card.setAttribute('aria-checked', String(sp === look.species));
+    card.querySelector('span')!.replaceChildren(thumb(sp, look.color, stage, SPECIES_LABEL[sp]));
+  }
+  for (const sw of el.swatches.querySelectorAll<HTMLButtonElement>('.swatch')) sw.setAttribute('aria-checked', String(sw.dataset.color === look.color));
+  const reached = STAGES.indexOf(stage);
+  el.stages.replaceChildren(...STAGES.map((st, i) => {
+    const fig = document.createElement('figure');
+    fig.className = i <= reached ? 'stage-card' : 'stage-card locked';
+    fig.append(thumb(look.species, look.color, st, `${SPECIES_LABEL[look.species]}, ${st}`));
+    const cap2 = document.createElement('figcaption');
+    cap2.textContent = i <= reached ? cap(st) : `${cap(st)} · ${STAGE_XP[st]} XP`;
+    fig.append(cap2);
+    return fig;
+  }));
+}
 async function saveAppearance(next: Partial<Appearance>) {
   const cur = latest?.appearance ?? { species: 'dragon' as Species, color: 'original' as ColorName };
   const body = { ...cur, ...next };
@@ -252,8 +315,12 @@ async function saveAppearance(next: Partial<Appearance>) {
   render();
   try { await fetch('/api/appearance', { method: 'POST', body: JSON.stringify(body) }); } catch { /* offline: kept locally until the next poll */ }
 }
-el.species.addEventListener('change', () => void saveAppearance({ species: el.species.value as Species }));
-el.color.addEventListener('change', () => void saveAppearance({ color: el.color.value as ColorName }));
+// Overlay: the ✎ button in the XP pill opens the full view's gallery (no right-click needed).
+el.customizeBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (window.byteHost?.openFullView) window.byteHost.openFullView();
+  else document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
+});
 
 window.byteHost?.onCommand?.((cmd) => {
   if (cmd.startsWith('species:')) void saveAppearance({ species: cmd.slice(8) as Species });

@@ -39,6 +39,7 @@
 
       <section class="xp">
         <span class="conn-mini" id="conn-mini" data-conn="waiting" title="Waiting"></span>
+        <button class="customize-btn" id="customize-btn" title="Change your pet" aria-label="Change your pet">✎</button>
         <span class="stage mini" id="stage-mini">Hatchling</span>
         <div class="xp-row"><strong id="xp">0 XP</strong><span id="xp-next">20 to sprout</span></div>
         <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar"><span id="bar-fill"></span></div>
@@ -49,9 +50,11 @@
         <ol id="milestones"><li class="empty">None yet. Fix a failing test to feed Byte.</li></ol>
       </section>
 
-      <section class="customize" aria-label="Customize Byte">
-        <label>Pet <select id="species"></select></label>
-        <label>Color <select id="color"></select></label>
+      <section class="gallery" id="gallery" aria-label="Your pet">
+        <h2>Your pet</h2>
+        <div class="species-grid" id="species-grid" role="radiogroup" aria-label="Pet type"></div>
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="Color"></div>
+        <div class="stages" id="stages" aria-label="Growth stages"></div>
       </section>
 
       <details class="details" id="details">

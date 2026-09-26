@@ -20,6 +20,7 @@ declare global {
       dragStart?(): void;
       dragMove?(dx: number, dy: number): void;
       dragEnd?(): void;
+      openFullView?(): void;
     };
   }
 }
@@ -38,6 +39,24 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const BODY_HUE: Record<Species, number> = { dragon: 150, fire: 10, cat: 28, robot: 168 };
 /** How far from the body hue still counts as body. The robot's recolor is only its teal glow, not its grey-blue metal. */
 const HUE_TOLERANCE: Record<Species, number> = { dragon: 32, fire: 32, cat: 32, robot: 18 };
+
+const shared = new Map<string, Promise<string>>();
+/**
+ * A frame of any pet type at any stage in any color preset, recolored the same way the
+ * animator does it (cached). Used by the full view's gallery.
+ */
+export function frameUrl(species: Species, color: ColorName, stage: Stage, pose = 'idle'): Promise<string> {
+  const url = `/pet/${species}/${stage}-${pose}.png`;
+  const target = COLORS[color];
+  if (target === null) return Promise.resolve(url);
+  const key = `${url}#${target}`;
+  let p = shared.get(key);
+  if (!p) {
+    p = recolor(url, BODY_HUE[species], target, HUE_TOLERANCE[species]).catch(() => url);
+    shared.set(key, p);
+  }
+  return p;
+}
 
 /**
  * Recolors one frame: pixels that are saturated and near the body hue move to the target

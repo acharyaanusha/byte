@@ -150,11 +150,37 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
   .pet[data-behavior='sleeping'] .zzz i { opacity: .8; }
 }
 
-/* Customize row (full view only) */
-.customize { display: flex; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
-.customize label { display: flex; align-items: center; gap: 6px; flex: 1; }
-.customize select { flex: 1; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; }
-html.overlay .customize { display: none; }
+/* Pet gallery (full view): every pet type in your color, color swatches, and your pet's stages. */
+.gallery h2 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.species-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.species-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 5px;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer;
+}
+.species-card span { display: block; width: 72px; height: 48px; }
+.species-card img { width: 72px; height: 48px; image-rendering: pixelated; }
+.species-card small { font-size: 10.5px; font-weight: 700; color: var(--ink-2); white-space: nowrap; }
+.species-card[aria-checked='true'] { border-color: var(--mint-deep); box-shadow: 0 0 0 2px #3e9d7833; }
+.species-card[aria-checked='true'] small { color: var(--ink); }
+.species-card:focus-visible, .swatch:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.swatches { display: flex; gap: 8px; justify-content: center; margin: 8px 0 6px; }
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-checked='true'] { box-shadow: 0 0 0 2px var(--ink); }
+.stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stage-card { margin: 0; display: flex; flex-direction: column; align-items: center; background: var(--sky); border-radius: 10px; padding: 3px 0 4px; }
+.stage-card img { width: 84px; height: 56px; image-rendering: pixelated; }
+.stage-card figcaption { font-size: 10.5px; font-weight: 700; color: var(--ink-2); }
+.stage-card.locked img { filter: grayscale(1) brightness(.35) opacity(.55); }
+.stage-card.locked figcaption { color: #9a9486; }
+html.overlay .gallery { display: none; }
+
+/* Overlay ✎ button: shown in the XP pill while hovering Byte. */
+.customize-btn { display: none; }
+html.overlay .customize-btn {
+  order: 3; width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+  background: var(--mint-deep); color: #fff; font-size: 11px; line-height: 18px;
+}
+html.overlay .app:hover .customize-btn { display: inline-block; }
 
 /* Overlay mode (?overlay): a small Byte, a thin XP bar, and a speech bubble that only shows when
    something changes, when Claude needs you or looks stuck, or on hover. Keep the footprint small. */
