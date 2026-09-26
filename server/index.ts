@@ -17,7 +17,7 @@ export interface ByteOptions {
   log?: (msg: string) => void;
 }
 
-const TRIGGERS = new Set(['command_ok', 'command_failed', 'stop']);
+const TRIGGERS = new Set(['command_ok', 'command_failed', 'stop', 'notify']);
 const MAX_BODY = 64 * 1024;
 
 export function createByte(opts: ByteOptions) {

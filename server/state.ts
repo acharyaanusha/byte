@@ -38,7 +38,7 @@ export function initialState(): PetState {
     celebrateUntil: 0, grewAt: 0, lastEventAt: 0,
     activeSessionId: null, otherSessionAt: 0, connection: 'waiting',
     milestoneHistory: [], awardedTurnIds: [], seenEventIds: [],
-    currentTurnEvidence: null, pastTurnIds: [], lastJudgment: null,
+    currentTurnEvidence: null, pastTurnIds: [], lastJudgment: null, needsYou: null, lastNotify: null,
   };
 }
 
@@ -57,39 +57,56 @@ export function newEvidence(turnId: string, promptExcerpt = ''): TurnEvidence {
  * Re-derives the milestone evidence by folding the turn's events in hook-time
  * order. Folding from scratch makes late (out-of-order) deliveries land in the
  * right place instead of being judged in arrival order.
+ *
+ * Success is only "pending" while it is still true at the end of the turn:
+ * - a later edit invalidates it (the code changed after it was checked);
+ * - a later failure of that check invalidates it, and any check whose latest
+ *   run failed blocks success entirely.
+ * A later pass after an edit can re-establish it. XP already awarded is never taken back.
  */
 export function deriveEvidence(ev: TurnEvidence): TurnEvidence {
-  const failed: Record<string, { editedSince: boolean; failId: string; editId?: string }> = {};
+  // Per check: its latest run, and the failure → edit that can make a later pass a recovery.
+  const lastRun: Record<string, 'pass' | 'fail'> = {};
+  const failPending: Record<string, { failId: string; editId?: string }> = {};
+  const recoverable: Record<string, { failId: string; editId: string }> = {};
+  let success: { check: string; kind: 'recovered' | 'verified'; trail: string[] } | null = null;
   let editSinceLastPass = false, sawEdit = false, lastEditId = '';
-  let recoveredCheck: string | null = null, verifiedCheck: string | null = null;
-  let trailIds: string[] = [];
   const failStreaks: Record<string, number> = {};
   let edits = 0;
   for (const e of ev.events) {
     const key = e.check ?? e.command;
     if (key && e.kind === 'command_failed') failStreaks[key] = (failStreaks[key] ?? 0) + 1;
     if (key && e.kind === 'command_ok') delete failStreaks[key];
-    if (e.kind === 'edit') edits++;
     if (e.kind === 'edit') {
+      edits++;
       sawEdit = true; editSinceLastPass = true; lastEditId = e.id;
-      for (const f of Object.values(failed)) if (!f.editedSince) { f.editedSince = true; f.editId = e.id; }
+      for (const f of Object.values(failPending)) f.editId ??= e.id;
+      success = null; // code changed after it was checked
     } else if (e.kind === 'command_failed' && e.check) {
-      failed[e.check] = { editedSince: false, failId: e.id };
+      lastRun[e.check] = 'fail';
+      failPending[e.check] = { failId: e.id };
+      if (success?.check === e.check) success = null;
     } else if (e.kind === 'command_ok' && e.check && e.checkPassed) {
-      const f = failed[e.check];
-      if (f?.editedSince) {
-        if (!recoveredCheck) trailIds = [f.failId, f.editId!, e.id];
-        recoveredCheck ??= e.check;
-      } else if (editSinceLastPass && !verifiedCheck) {
-        verifiedCheck = e.check;
-        if (!recoveredCheck) trailIds = [lastEditId, e.id];
-      }
-      delete failed[e.check];
+      lastRun[e.check] = 'pass';
+      const f = failPending[e.check];
+      if (f?.editId) recoverable[e.check] = { failId: f.failId, editId: f.editId };
+      delete failPending[e.check];
+      const r = recoverable[e.check];
+      if (r) success = { check: e.check, kind: 'recovered', trail: [r.failId, r.editId, e.id] };
+      else if (editSinceLastPass) success = { check: e.check, kind: 'verified', trail: [lastEditId, e.id] };
       editSinceLastPass = false;
     }
   }
-  const failedOut = Object.fromEntries(Object.entries(failed).map(([k, v]) => [k, { editedSince: v.editedSince }]));
-  return { ...ev, failed: failedOut, editSinceLastPass, sawEdit, recoveredCheck, verifiedCheck, trailIds, failStreaks, edits };
+  const failing = Object.keys(lastRun).filter((k) => lastRun[k] === 'fail');
+  if (failing.length) success = null; // an unresolved failure overrides any success
+  const failed = Object.fromEntries(failing.map((k) => [k, { editedSince: !!failPending[k]?.editId }]));
+  return {
+    ...ev, failed, editSinceLastPass, sawEdit,
+    recoveredCheck: success?.kind === 'recovered' ? success.check : null,
+    verifiedCheck: success?.kind === 'verified' ? success.check : null,
+    trailIds: success?.trail ?? [],
+    failStreaks, edits,
+  };
 }
 
 const RELEVANT = new Set(['edit', 'command_failed', 'command_ok']);
@@ -140,6 +157,9 @@ function bounded<T>(list: T[], item: T, max: number): T[] {
 }
 
 export type EventOutcome = 'applied' | 'duplicate' | 'other_session';
+const NOTIFY_DUP_MS = 2000;
+/** Events that mean work has resumed (Stop does not: Claude may be waiting after it). */
+const WORK = new Set(['prompt', 'read', 'edit', 'command_ok', 'command_failed']);
 
 /**
  * Applies one normalized event. Byte follows one session at a time: the one you
@@ -149,6 +169,10 @@ export type EventOutcome = 'applied' | 'duplicate' | 'other_session';
  */
 export function reduceEvent(state: PetState, event: PetEvent): { state: PetState; outcome: EventOutcome } {
   if (state.seenEventIds.includes(event.id)) return { state, outcome: 'duplicate' };
+  const n = state.lastNotify;
+  if (event.kind === 'notify' && n && n.message === (event.message ?? '') && Math.abs(event.timestamp - n.at) < NOTIFY_DUP_MS) {
+    return { state, outcome: 'duplicate' }; // the same notification delivered twice (e.g. two hook installs)
+  }
   let s: PetState = state;
   if (s.activeSessionId && s.activeSessionId !== event.sessionId) {
     const takesOver = event.kind === 'prompt'
@@ -156,7 +180,7 @@ export function reduceEvent(state: PetState, event: PetEvent): { state: PetState
     if (!takesOver) {
       return { state: { ...s, otherSessionAt: event.timestamp }, outcome: 'other_session' };
     }
-    s = { ...s, activeSessionId: event.sessionId, currentTurnEvidence: null, otherSessionAt: 0 };
+    s = { ...s, activeSessionId: event.sessionId, currentTurnEvidence: null, otherSessionAt: 0, needsYou: null };
   }
   const latest = event.timestamp >= s.lastEventAt;
   s = {
@@ -178,6 +202,14 @@ export function reduceEvent(state: PetState, event: PetEvent): { state: PetState
     else if (event.kind !== 'session_start') ev = addToEvidence(ev, event);
   }
   s.currentTurnEvidence = ev ?? null;
+
+  // Needs you: set by a permission/input notification, cleared by the next sign of work.
+  if (event.kind === 'notify') {
+    s.needsYou = { since: event.timestamp, message: event.message ?? '' };
+    s.lastNotify = { message: event.message ?? '', at: event.timestamp };
+  } else if (s.needsYou && WORK.has(event.kind) && event.timestamp > s.needsYou.since) {
+    s.needsYou = null;
+  }
 
   // A late delivery must not snap the pet back to an older mood.
   const look = localBehavior(event.kind);
@@ -252,7 +284,14 @@ export function markDegraded(state: PetState): PetState {
 }
 
 export function disconnect(state: PetState): PetState {
-  return { ...state, activeSessionId: null, currentTurnEvidence: null, behavior: 'idle', caption: CAPTIONS.hello };
+  return { ...state, activeSessionId: null, currentTurnEvidence: null, needsYou: null, behavior: 'idle', caption: CAPTIONS.hello };
+}
+
+/** Should Byte ask for you? An explicit notification, or a fresh Jev judgment saying so. */
+export function needsYou(state: PetState): boolean {
+  if (state.needsYou) return true;
+  const j = state.lastJudgment;
+  return !!j && j.turnId === state.currentTurnEvidence?.turnId && j.at >= state.lastEventAt && j.needsAttention >= MIN_PROBABILITY;
 }
 
 export type StatusTone = 'idle' | 'working' | 'stuck' | 'waiting' | 'done' | 'failing';
@@ -275,9 +314,10 @@ export function sessionStatus(state: PetState, now: number): { tone: StatusTone;
   const ended = last.kind === 'stop';
   const streaks = Object.entries(ev.failStreaks ?? {}).sort((x, y) => y[1] - x[1]);
   const failing = streaks.map(([k]) => k).filter((k) => ev.failed[k]);
-  const judged = state.lastJudgment?.turnId === ev.turnId ? state.lastJudgment : null;
+  // Only a judgment made after the latest event still describes the session.
+  const judged = state.lastJudgment?.turnId === ev.turnId && state.lastJudgment.at >= state.lastEventAt ? state.lastJudgment : null;
 
-  if (last.kind === 'notify') return { tone: 'waiting', text: `Needs you: ${last.message || 'Claude is waiting for your input.'}` };
+  if (state.needsYou) return { tone: 'waiting', text: `Needs you: ${state.needsYou.message || 'Claude is waiting for your input.'}` };
   const loop = streaks.find(([, n]) => n >= LOOP_AFTER);
   if (loop && !ended) return { tone: 'stuck', text: `Looping? “${loop[0]}” failed ${loop[1]}× in a row.` };
   if (judged && judged.needsAttention >= MIN_PROBABILITY) return { tone: 'waiting', text: 'Claude may be waiting on you.' };
@@ -308,11 +348,12 @@ export function sessionStatus(state: PetState, now: number): { tone: StatusTone;
 
 /** What the browser sees: no dedup bookkeeping, no raw event outputs. */
 export function publicState(state: PetState, now: number) {
-  const { seenEventIds, awardedTurnIds, pastTurnIds, currentTurnEvidence, ...rest } = state;
+  const { seenEventIds, awardedTurnIds, pastTurnIds, currentTurnEvidence, lastNotify, ...rest } = state;
   return {
     ...rest,
     now,
     status: sessionStatus(state, now),
+    needsYou: needsYou(state),
     turn: currentTurnEvidence && {
       turnId: currentTurnEvidence.turnId,
       sawEdit: currentTurnEvidence.sawEdit,

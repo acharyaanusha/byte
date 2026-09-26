@@ -95,9 +95,13 @@ export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null
     } else return null;
   } else return null;
 
+  // Tool events carry tool_use_id. Notifications are separate occurrences even with the same
+  // text, so their id includes the hook time; a repeated delivery of one is dropped by the reducer.
   const id = toolUseId
     ? `${sessionId}:${toolUseId}:${kind}`
-    : `${sessionId}:${kind}:${stableId([turnId, raw.prompt, raw.source, raw.last_assistant_message, toolInput])}`;
+    : kind === 'notify'
+      ? `${sessionId}:notify:${stableId([turnId, raw.message, raw.notification_type, raw.hook_ts])}`
+      : `${sessionId}:${kind}:${stableId([turnId, raw.prompt, raw.source, raw.last_assistant_message, toolInput])}`;
   // hook_ts is stamped by the hook when Claude Code runs it, so ordering survives async delivery.
   const timestamp = typeof raw.hook_ts === 'number' && Number.isFinite(raw.hook_ts) ? raw.hook_ts : now;
   return { id, sessionId, turnId, timestamp, kind, ...extra };

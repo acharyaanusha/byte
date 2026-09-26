@@ -150,32 +150,37 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
   .pet[data-behavior='sleeping'] .zzz i { opacity: .8; }
 }
 
-/* Overlay mode (?overlay): just Byte, a speech bubble and a thin XP bar on a transparent window. */
+/* Overlay mode (?overlay): a small Byte, a thin XP bar, and a speech bubble that only shows when
+   something changes, when Claude needs you or looks stuck, or on hover. Keep the footprint small. */
 html.overlay, html.overlay body { background: transparent; }
-html.overlay .app { background: transparent; min-height: 0; max-width: none; height: 100vh; padding: 0 8px 6px; gap: 2px; justify-content: flex-end; overflow: hidden; }
+html.overlay .app { background: transparent; min-height: 0; max-width: none; height: 100vh; padding: 0 4px 4px; gap: 3px; align-items: center; justify-content: flex-end; overflow: hidden; }
 html.overlay .top, html.overlay .milestones, html.overlay .details, html.overlay .actions, html.overlay #other-banner { display: none !important; }
 /* In the overlay the demo label lives in the XP pill (see .stage.mini.demo). */
 html.overlay .banner.demo { display: none !important; }
 html.overlay .stage.mini.demo { background: #2c3a36; color: #fdf7e6; }
 html.overlay .caption {
-  order: -1; position: relative; align-self: center; min-height: 0; max-width: 204px; flex: none;
-  font-size: 11.5px; line-height: 1.3; padding: 5px 9px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
+  order: -1; position: relative; align-self: center; min-height: 0; max-width: 184px; flex: none;
+  font-size: 11px; line-height: 1.3; padding: 4px 8px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
   cursor: grab; box-shadow: 0 2px 0 #2c3a36; user-select: none;
 }
 html.overlay .caption::after {
   content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px;
   background: #fffdf7; border-right: 1.5px solid #2c3a36; border-bottom: 1.5px solid #2c3a36; transform: rotate(45deg);
 }
-html.overlay .habitat { height: 112px; flex: none; background: none; border: 0; overflow: visible; }
+html.overlay .caption:not(.show) { visibility: hidden; }
+html.overlay .habitat { height: 72px; width: 120px; flex: none; background: none; border: 0; overflow: visible; }
 html.overlay .sun, html.overlay .hill, html.overlay .flash { display: none; }
-html.overlay .pet { width: 168px; height: 112px; margin-left: -84px; bottom: 0; }
-html.overlay .pet img { width: 168px; height: 112px; }
-html.overlay .shadow { bottom: 4px; width: 54px; margin-left: -27px; }
-html.overlay .xp { display: flex; align-items: center; gap: 6px; cursor: grab; user-select: none; background: #fffdf7e6; border: 1.5px solid #2c3a36; border-radius: 99px; padding: 3px 8px; }
-html.overlay .xp-row { margin: 0; font-size: 11px; order: 2; }
+html.overlay .pet { width: 108px; height: 72px; margin-left: -54px; bottom: 0; }
+html.overlay .pet img { width: 108px; height: 72px; }
+html.overlay .shadow { bottom: 3px; width: 36px; height: 8px; margin-left: -18px; }
+html.overlay .zzz, html.overlay .puzzle { font-size: 14px; top: 2px; right: 14px; }
+html.overlay .xp { display: flex; align-items: center; gap: 5px; cursor: grab; user-select: none; background: #fffdf7d9; border: 1px solid #2c3a3666; border-radius: 99px; padding: 2px 6px; }
+html.overlay .xp-row { margin: 0; font-size: 10px; order: 2; }
 html.overlay .xp-row span { display: none; }
-html.overlay .bar { flex: 1; height: 7px; order: 1; }
-html.overlay .stage.mini { display: inline; font-size: 9.5px; padding: 1px 6px; order: 0; }
+html.overlay .bar { flex: none; width: 56px; height: 5px; order: 1; }
+html.overlay .stage.mini { display: inline; font-size: 9px; padding: 0 5px; order: 0; }
+/* Resting: just the dot and the bar. Hover shows the stage and XP number. */
+html.overlay .app:not(:hover) .xp-row, html.overlay .app:not(:hover) .stage.mini:not(.demo) { display: none; }
 
 /* Session status tones: a small colored dot before the text says how it's going at a glance. */
 .app .caption[data-tone]::before {
@@ -188,3 +193,10 @@ html.overlay .stage.mini { display: inline; font-size: 9.5px; padding: 1px 6px; 
 .caption[data-tone='failing'] { --tone: var(--gold); }
 .caption[data-tone='stuck'] { --tone: #e0823d; }
 .caption[data-tone='waiting'] { --tone: var(--rose); }
+
+/* Connection dot: shown in the overlay's XP pill (the full view has the header indicator). */
+.conn-mini { display: none; width: 8px; height: 8px; border-radius: 50%; flex: none; background: #b9b3a3; }
+.conn-mini[data-conn='live'] { background: #3fb67d; }
+.conn-mini[data-conn='degraded'] { background: var(--gold); }
+.conn-mini[data-conn='offline'] { background: var(--rose); box-shadow: 0 0 0 2px #ef7b8e44; }
+html.overlay .conn-mini { display: inline-block; order: -1; }

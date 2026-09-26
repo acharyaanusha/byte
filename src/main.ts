@@ -14,6 +14,8 @@ if (overlay) {
 const SLEEP_AFTER_MS = 90_000;
 const HOLD_MS = 3000;
 const REACTION_MS = 2500;
+/** Overlay bubble: stays up this long after its text changes, then hides unless it needs attention. */
+const BUBBLE_MS = 6000;
 const THRESHOLDS: Record<Stage, [number, number | null, string | null]> = {
   hatchling: [0, 20, 'sprout'],
   sprout: [20, 50, 'companion'],
@@ -27,7 +29,7 @@ const el = {
   caption: $('caption'), xp: $('xp'), xpNext: $('xp-next'), bar: $('bar'), barFill: $('bar-fill'),
   milestones: $('milestones'), details: $('details-body'), hearts: $('hearts'), flash: $('flash'),
   replay: $<HTMLButtonElement>('replay'), disconnect: $<HTMLButtonElement>('disconnect'),
-  demoBanner: $('demo-banner'), otherBanner: $('other-banner'), stageMini: $('stage-mini'), flip: $('flip'),
+  demoBanner: $('demo-banner'), otherBanner: $('other-banner'), stageMini: $('stage-mini'), flip: $('flip'), connMini: $('conn-mini'),
 };
 
 const pageStart = Date.now();
@@ -41,6 +43,11 @@ let petCaptionUntil = 0;
 let stopReplay: (() => void) | null = null;
 /** Bumped on every replay start/exit so a live poll already in flight can't overwrite demo state. */
 let replayGen = 0;
+let bubbleText = '';
+let bubbleSince = 0;
+let hovering = false;
+document.addEventListener('mouseover', () => { hovering = true; });
+document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) hovering = false; });
 
 const animator = new PetAnimator(el.pet, el.sprite, el.flip);
 
@@ -110,15 +117,18 @@ function render() {
   el.disconnect.disabled = replaying;
 
   if (!s) {
-    el.conn.dataset.conn = 'offline';
-    el.connLabel.textContent = 'Server offline';
+    el.conn.dataset.conn = el.connMini.dataset.conn = 'offline';
+    el.connLabel.textContent = el.connMini.title = 'Server offline';
+    el.caption.dataset.tone = 'failing';
+    el.caption.textContent = 'Byte server is offline. Start it with npm run dev.';
+    el.caption.classList.add('show');
     return;
   }
 
   // Connection
   const conn = offline && !replaying ? 'offline' : s.connection;
-  el.conn.dataset.conn = conn;
-  el.connLabel.textContent = replaying ? 'Demo' : { live: 'Jev live', degraded: 'Degraded · no XP', waiting: 'Waiting', offline: 'Server offline' }[conn];
+  el.conn.dataset.conn = el.connMini.dataset.conn = replaying ? 'live' : conn;
+  el.connLabel.textContent = el.connMini.title = replaying ? 'Demo' : { live: 'Jev live', degraded: 'Degraded · no XP', waiting: 'Waiting', offline: 'Server offline' }[conn];
   el.conn.title = conn === 'degraded' ? 'Jev unavailable: Byte still reacts, but awards no XP.' : '';
   el.otherBanner.hidden = replaying || !s.otherSessionAt || now - s.otherSessionAt > 15_000;
 
@@ -142,9 +152,12 @@ function render() {
     el.pet.dataset.behavior = shown;
     animator.setBehavior(shown);
   }
-  const j = s.lastJudgment;
-  animator.setAttention(!!j && j.needsAttention >= 0.8 && now - j.at < 30_000 && now >= s.celebrateUntil);
+  animator.setAttention(s.needsYou && now >= s.celebrateUntil);
 
+  if (offline && !replaying) {
+    el.caption.dataset.tone = 'failing';
+    el.caption.textContent = 'Byte server is offline. Start it with npm run dev.';
+  } else {
   // Caption: a quick reaction right after something happens, otherwise how the session is going.
   const reacting = now - s.lastEventAt < REACTION_MS || now < s.celebrateUntil;
   const tone = now < petCaptionUntil || reacting ? 'reaction' : s.status.tone;
@@ -153,8 +166,16 @@ function render() {
     : reacting ? s.caption
     : s.status.tone === 'idle' && shown === 'sleeping' ? 'Zzz… (no activity for a bit)'
     : s.status.text;
+  }
 
   el.stageMini.textContent = replaying ? `Demo · ${el.stage.textContent}` : el.stage.textContent;
+
+  // Overlay bubble: only when something changed, when it matters (needs you / stuck / offline), or on hover.
+  // Ticking durations ("· 22s") don't count as a change.
+  const key = (el.caption.textContent ?? '').replace(/\d+[sm]\b/g, '');
+  if (key !== bubbleText) { bubbleText = key; bubbleSince = now; }
+  const urgent = ['waiting', 'stuck'].includes(el.caption.dataset.tone ?? '') || (offline && !replaying);
+  el.caption.classList.toggle('show', !overlay || hovering || urgent || now - bubbleSince < BUBBLE_MS);
 
   // XP
   const [lo, hi, nextStage] = THRESHOLDS[s.stage];
@@ -214,6 +235,7 @@ function toggleReplay() {
 el.replay.addEventListener('click', toggleReplay);
 window.byteHost?.onCommand?.((cmd) => {
   if (cmd === 'replay') toggleReplay();
+  if (cmd === 'disconnect') el.disconnect.click();
 });
 
 function exitReplay() {

@@ -6,9 +6,9 @@ const { app, BrowserWindow, ipcMain, Menu, screen, shell } = require('electron')
 const path = require('node:path');
 
 const UI = process.env.BYTE_UI_URL ?? 'http://127.0.0.1:5173/';
-const W = 220, H = 190;
+const W = 196, H = 150;
 /** Byte wanders at most this far either side of where you last put it. */
-const WANDER = 110;
+const WANDER = 90;
 let win;
 let homeX = 0;
 
@@ -36,6 +36,7 @@ function create() {
     Menu.buildFromTemplate([
       { label: 'Open full view', click: () => shell.openExternal(UI) },
       { label: 'Replay demo / exit demo', click: () => win.webContents.send('byte:command', 'replay') },
+      { label: 'Disconnect from this Claude session', click: () => win.webContents.send('byte:command', 'disconnect') },
       { type: 'separator' },
       { label: 'Quit Byte overlay', click: () => app.quit() },
     ]).popup({ window: win });

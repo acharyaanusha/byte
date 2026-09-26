@@ -11,6 +11,7 @@ function describe(e: PetEvent, label: string): string {
   let line = `${label} ${e.kind}`;
   if (e.command) line += ` command=${JSON.stringify(e.command)}`;
   if (e.check) line += ` recognized_check=${JSON.stringify(e.check)} output_shows_pass=${e.checkPassed ? 'yes' : 'no'}`;
+  if (e.message) line += ` message=${JSON.stringify(e.message.slice(0, 160))}`;
   if (e.outputExcerpt) line += `\n   output (tail): ${JSON.stringify(e.outputExcerpt.slice(-500))}`;
   return line;
 }
@@ -64,7 +65,7 @@ export function buildQuestions() {
     },
     needs_attention: {
       type: 'noul',
-      instructions: 'Does the visible evidence show the coding agent needs input from the user to proceed?',
+      instructions: 'Does the visible evidence show the coding agent needs input from the user to proceed (for example a permission request or a question it is waiting on), with no work since?',
     },
   };
 }

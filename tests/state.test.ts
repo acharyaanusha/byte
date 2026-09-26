@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyJudgment, initialState, jevEvents, reduceEvent, sessionStatus, stageFor, TAKEOVER_MS } from '../server/state.js';
+import { applyJudgment, initialState, jevEvents, needsYou, publicState, reduceEvent, sessionStatus, stageFor, TAKEOVER_MS } from '../server/state.js';
 import { buildState } from '../server/jev.js';
 import { canonicalCheck, looksPassing, normalizeHook } from '../server/claude.js';
 import type { EventKind, PetEvent, PetJudgment, PetState } from '../shared/types.js';
@@ -244,5 +244,82 @@ describe('session status', () => {
   it('normalizes the Notification hook', () => {
     const e = normalizeHook({ session_id: 's', prompt_id: 'p', hook_event_name: 'Notification', message: 'Claude is waiting for your input' });
     expect(e).toMatchObject({ kind: 'notify', message: 'Claude is waiting for your input' });
+  });
+});
+
+describe('superseded success evidence', () => {
+  const regression = () => [ev('prompt'), failTest(), ev('edit'), passTest(), ev('edit'), failTest(), ev('stop')];
+  it('fail → edit → pass → edit → fail → stop: no "fixed" status and no pending award', () => {
+    const s = run(regression());
+    const e = s.currentTurnEvidence!;
+    expect(e.recoveredCheck).toBeNull();
+    expect(e.verifiedCheck).toBeNull();
+    expect(sessionStatus(s, s.lastEventAt + 1000)).toEqual({ tone: 'failing', text: 'Finished, but npm test is still failing.' });
+    expect(applyJudgment(s, yes('recovered_from_failure', 0.99), 't1', 9000, e.version).awarded).toBe(0);
+  });
+  it('a newer edit invalidates pending verification', () => {
+    const s = run([ev('prompt'), ev('edit'), passTest(), ev('edit')]);
+    expect(s.currentTurnEvidence!.verifiedCheck).toBeNull();
+    expect(applyJudgment(s, yes('verified_progress'), 't1', 9000).awarded).toBe(0);
+  });
+  it('a failure of another check also blocks success', () => {
+    const tc = (ok: boolean) => ev(ok ? 'command_ok' : 'command_failed', { check: 'npm run typecheck', checkPassed: ok });
+    const s = run([ev('prompt'), ev('edit'), passTest(), tc(false)]);
+    expect(s.currentTurnEvidence!.verifiedCheck).toBeNull();
+  });
+  it('a tweak after a recovery that passes again is still a recovery', () => {
+    const s = run([ev('prompt'), failTest(), ev('edit'), passTest(), ev('edit'), passTest()]);
+    expect(s.currentTurnEvidence!.recoveredCheck).toBe('npm test');
+  });
+  it('XP already awarded is kept when the turn later regresses', () => {
+    let s = run([ev('prompt'), failTest(), ev('edit'), passTest()]);
+    s = applyJudgment(s, yes('recovered_from_failure'), 't1', 9000).state;
+    s = run([ev('edit'), failTest(), ev('stop')], s);
+    expect(s.xp).toBe(20);
+    expect(s.milestoneHistory).toHaveLength(1);
+    expect(sessionStatus(s, s.lastEventAt + 1000).tone).toBe('failing');
+    expect(applyJudgment(s, yes('recovered_from_failure'), 't1', 9500).awarded).toBe(0);
+  });
+});
+
+describe('needs you', () => {
+  const note = (message: string, timestamp: number, id = `n${timestamp}`) => ev('notify', { id, message, timestamp });
+  it('a permission notification turns on attention; resumed work clears it; Stop does not', () => {
+    let s = run([ev('prompt', { timestamp: 10 }), note('Claude needs your permission to use Bash', 20)]);
+    expect(needsYou(s)).toBe(true);
+    expect(publicState(s, 30).needsYou).toBe(true);
+    expect(sessionStatus(s, 30).text).toBe('Needs you: Claude needs your permission to use Bash');
+    expect(needsYou(run([ev('stop', { timestamp: 25 })], s))).toBe(true);
+    s = run([ev('command_ok', { command: 'ls', timestamp: 40 })], s);
+    expect(needsYou(s)).toBe(false);
+    expect(sessionStatus(s, 50).tone).not.toBe('waiting');
+  });
+  it('an older Jev judgment no longer asks for you once new events arrive', () => {
+    let s = run([ev('prompt', { timestamp: 10 }), failTest()]);
+    s = applyJudgment(s, { activity: 'blocked', milestone: 'none', milestoneProbability: 1, needsAttention: 0.95 }, 't1', s.lastEventAt + 1).state;
+    expect(needsYou(s)).toBe(true);
+    s = run([ev('edit', { timestamp: s.lastEventAt + 5 })], s);
+    expect(needsYou(s)).toBe(false);
+  });
+  it('different notifications in one turn are separate; a repeated delivery is dropped', () => {
+    const raw = (message: string, hook_ts: number) => ({ session_id: 's', prompt_id: 'p', hook_event_name: 'Notification', message, hook_ts });
+    const a = normalizeHook(raw('Claude needs your permission to use Bash', 1000))!;
+    const b = normalizeHook(raw('Claude is waiting for your input', 5000))!;
+    const aAgain = normalizeHook(raw('Claude needs your permission to use Bash', 1000))!;
+    const aTwin = normalizeHook(raw('Claude needs your permission to use Bash', 1150))!; // second hook install
+    const aLater = normalizeHook(raw('Claude needs your permission to use Bash', 60_000))!;
+    expect(a.id).not.toBe(b.id);
+    expect(a.id).toBe(aAgain.id);
+    let s = run([ev('prompt', { sessionId: 's', turnId: 'p', timestamp: 500 })]);
+    s = reduceEvent(s, a).state;
+    expect(reduceEvent(s, aAgain).outcome).toBe('duplicate');
+    expect(reduceEvent(s, aTwin).outcome).toBe('duplicate');
+    s = reduceEvent(s, b).state;
+    expect(reduceEvent(s, aLater).outcome).toBe('applied');
+    expect(s.currentTurnEvidence!.events.filter((e) => e.kind === 'notify')).toHaveLength(2);
+  });
+  it('Jev sees the notification text', () => {
+    const s = run([ev('prompt'), ev('notify', { message: 'Claude needs your permission to use Bash' })]);
+    expect(buildState(s.currentTurnEvidence!)).toContain('message="Claude needs your permission to use Bash"');
   });
 });

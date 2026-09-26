@@ -30,6 +30,9 @@ const WALK_FRAME_MS = 150;
 const STEP_PX = 10;
 const HABITAT_RANGE = 80;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+/** prefers-reduced-motion: no walking (which moves the whole overlay window) and no looping frames. */
+const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+const calm = () => !!reducedMotion?.matches;
 
 export class PetAnimator {
   private stage: Stage = 'hatchling';
@@ -78,6 +81,7 @@ export class PetAnimator {
   /** Picks the next thing to do, based on the pet's current mood. */
   private plan(now: number) {
     const pick = (a: Activity, min: number, max: number) => { this.activity = a; this.activityUntil = now + rand(min, max); };
+    if (calm()) return pick(this.attention ? 'greet' : 'stand', 5000, 5000);
     if (this.attention && this.mode !== 'sleeping' && this.mode !== 'celebrating') {
       // Needs you: stop and wave, with a glance around between waves.
       return this.activity === 'greet' ? pick('look', 800, 1200) : pick('greet', 2500, 3500);
@@ -108,7 +112,7 @@ export class PetAnimator {
     if (now < this.waveUntil) return 'wave';
     if (this.mode === 'sleeping') return 'sleep';
     if (this.mode === 'puzzled' && !this.attention) return 'puzzled';
-    if (this.mode === 'celebrating') return Math.floor(now / 300) % 2 ? 'jump' : 'idle';
+    if (this.mode === 'celebrating') return calm() ? 'jump' : Math.floor(now / 300) % 2 ? 'jump' : 'idle';
     switch (this.activity) {
       case 'walk': return WALK[this.walkIndex];
       case 'sit': return 'sit';
@@ -119,16 +123,16 @@ export class PetAnimator {
 
   private async step() {
     const now = Date.now();
-    if (now >= this.nextBlink) { this.blinkUntil = now + 140; this.nextBlink = now + rand(2500, 5000); }
+    if (!calm() && now >= this.nextBlink) { this.blinkUntil = now + 140; this.nextBlink = now + rand(2500, 5000); }
     if (now >= this.activityUntil) {
       if (this.activity === 'turn') this.facing = this.facing === 1 ? -1 : 1;
       this.plan(now);
       if (this.activity === 'walk' && Math.random() < 0.35) this.turn(now); // sometimes set off the other way
     }
     // Looking around: glance the other way now and then.
-    if (this.activity === 'look' && Math.random() < 0.03) this.facing = this.facing === 1 ? -1 : 1;
+    if (!calm() && this.activity === 'look' && Math.random() < 0.03) this.facing = this.facing === 1 ? -1 : 1;
 
-    const walking = this.activity === 'walk'
+    const walking = !calm() && this.activity === 'walk'
       && !this.held && !this.hovered && now >= this.waveUntil
       && this.mode !== 'sleeping' && this.mode !== 'celebrating' && (this.mode !== 'puzzled' || this.attention);
     if (walking && now >= this.nextFrameAt && !this.moving) {

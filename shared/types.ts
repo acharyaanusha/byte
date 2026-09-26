@@ -80,6 +80,10 @@ export interface PetState {
   awardedTurnIds: string[];
   seenEventIds: string[];
   currentTurnEvidence: TurnEvidence | null;
+  /** Set by a permission/input notification; cleared by the next sign of work. */
+  needsYou: { since: number; message: string } | null;
+  /** Last notification seen, to drop a repeated delivery of the same one. */
+  lastNotify: { message: string; at: number } | null;
   /** Turns that are over; late events for them never count as evidence. Bounded. */
   pastTurnIds: string[];
   lastJudgment: (PetJudgment & { turnId: string; at: number; awarded: boolean }) | null;

@@ -35,6 +35,7 @@ async function main() {
     error: cut(raw.error, 2000, true),
     last_assistant_message: cut(raw.last_assistant_message, 200),
     message: cut(raw.message, 200),
+    notification_type: cut(raw.notification_type, 60),
   };
   await fetch(URL, {
     method: 'POST',
