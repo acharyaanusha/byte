@@ -177,12 +177,14 @@ html.overlay .xp-row span { display: none; }
 html.overlay .bar { flex: 1; height: 7px; order: 1; }
 html.overlay .stage.mini { display: inline; font-size: 9.5px; padding: 1px 6px; order: 0; }
 
-/* Session status tones: a colored edge on the bubble says how it's going at a glance. */
-.app .caption[data-tone] { border-left-width: 5px; }
-.app .caption[data-tone='working'] { border-left-color: var(--mint-deep); }
-.app .caption[data-tone='done'] { border-left-color: #3fb67d; }
-.app .caption[data-tone='failing'] { border-left-color: var(--gold); }
-.app .caption[data-tone='stuck'] { border-left-color: #e0823d; }
-.app .caption[data-tone='waiting'] { border-left-color: var(--rose); }
-.caption[data-tone='reaction'], .caption[data-tone='idle'] { border-left-width: 1px; }
-html.overlay .caption[data-tone='reaction'], html.overlay .caption[data-tone='idle'] { border-left-width: 1.5px; }
+/* Session status tones: a small colored dot before the text says how it's going at a glance. */
+.app .caption[data-tone]::before {
+  content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px;
+  display: inline-block; vertical-align: 1px; background: var(--tone, transparent);
+}
+.app .caption[data-tone='reaction']::before, .app .caption[data-tone='idle']::before { display: none; }
+.caption[data-tone='working'] { --tone: var(--mint-deep); }
+.caption[data-tone='done'] { --tone: #3fb67d; }
+.caption[data-tone='failing'] { --tone: var(--gold); }
+.caption[data-tone='stuck'] { --tone: #e0823d; }
+.caption[data-tone='waiting'] { --tone: var(--rose); }
