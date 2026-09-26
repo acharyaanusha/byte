@@ -323,3 +323,11 @@ describe('needs you', () => {
     expect(buildState(s.currentTurnEvidence!)).toContain('message="Claude needs your permission to use Bash"');
   });
 });
+
+describe('stale turns', () => {
+  it('a turn with no activity for 10 minutes is shown as resting, not in progress', () => {
+    const s = run([ev('prompt', { timestamp: 1000 })]);
+    expect(sessionStatus(s, 1000 + 60_000).text).toBe('Thinking about your prompt…');
+    expect(sessionStatus(s, 1000 + 11 * 60_000)).toEqual({ tone: 'idle', text: 'Resting. Nothing from Claude for 11m.' });
+  });
+});

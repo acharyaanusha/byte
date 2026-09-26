@@ -44,7 +44,7 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Byte-0.1.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+1. Download **Byte-0.1.1-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
 2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
 3. Byte asks to **connect to Claude Code**. It adds small async hooks to `~/.claude/settings.json` and keeps a backup. Start a new Claude Code session and Byte follows it.
 4. Right-click Byte → **Set Jev API key…** and paste your [TypeSafe](https://docs.typesafe.ai) key. Without a key, Byte still reacts but awards no XP.

@@ -297,6 +297,8 @@ export function needsYou(state: PetState): boolean {
 export type StatusTone = 'idle' | 'working' | 'stuck' | 'waiting' | 'done' | 'failing';
 export const LOOP_AFTER = 3;
 const QUIET_MS = 90_000;
+/** After this long with nothing from Claude, stop describing the turn as in progress. */
+const IDLE_MS = 10 * 60_000;
 
 const mins = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : `${Math.round(ms / 60_000)}m`);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -309,6 +311,8 @@ export function sessionStatus(state: PetState, now: number): { tone: StatusTone;
   const ev = state.currentTurnEvidence;
   if (!state.activeSessionId) return { tone: 'idle', text: 'Not following a Claude session yet.' };
   if (!ev) return { tone: 'idle', text: 'Connected. Waiting for your prompt.' };
+  const silent = now - state.lastEventAt;
+  if (silent > IDLE_MS && !state.needsYou) return { tone: 'idle', text: `Resting. Nothing from Claude for ${mins(silent)}.` };
   if (ev.events.length === 0) return { tone: 'working', text: 'Thinking about your prompt…' };
 
   const last = ev.events[ev.events.length - 1];
