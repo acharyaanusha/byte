@@ -15,17 +15,24 @@ export interface ByteOptions {
   judgeImpl?: typeof judge;
   schedule?: { debounceMs: number; cooldownMs: number };
   log?: (msg: string) => void;
+  /** Serve the built UI from this directory (the packaged app); dev uses Vite instead. */
+  staticDir?: string;
 }
 
 const TRIGGERS = new Set(['command_ok', 'command_failed', 'stop', 'notify']);
 const MAX_BODY = 64 * 1024;
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
+  '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.ico': 'image/x-icon',
+};
 
 export function createByte(opts: ByteOptions) {
   const log = opts.log ?? ((m: string) => console.log(`[byte] ${m}`));
   const store = new Store(opts.statePath);
   let state: PetState = loadState(opts.statePath) ?? initialState();
+  let apiKey = opts.apiKey;
   // Connection is a property of this run, not of the saved pet.
-  state = opts.apiKey ? { ...state, connection: 'waiting' } : markDegraded(state);
+  state = apiKey ? { ...state, connection: 'waiting' } : markDegraded(state);
   const set = (next: PetState) => { state = next; store.save(state); };
 
   const scheduler = new JudgeScheduler(async () => {
@@ -34,10 +41,10 @@ export function createByte(opts: ByteOptions) {
     // Captured now: a late reply must not touch a newer turn or newer evidence in this turn.
     const turnId = ev.turnId;
     const version = ev.version;
-    if (!opts.apiKey) { set(markDegraded(state)); return; }
+    if (!apiKey) { set(markDegraded(state)); return; }
     let judgment: PetJudgment;
     try {
-      judgment = await (opts.judgeImpl ?? judge)(ev, { apiKey: opts.apiKey });
+      judgment = await (opts.judgeImpl ?? judge)(ev, { apiKey });
     } catch (err) {
       log(`jev failed turn=${turnId}: ${(err as Error).name}: ${(err as Error).message}`);
       set(markDegraded(state));
@@ -85,20 +92,36 @@ export function createByte(opts: ByteOptions) {
       });
       return;
     }
+    if (req.method === 'GET' && opts.staticDir) return serveStatic(opts.staticDir, req.url ?? '/', res);
     send(404, { error: 'not found' });
   });
 
   return {
     server,
     ingest,
+    /** Set or clear the Jev key at runtime (the app's "Set Jev API key…" menu). */
+    setApiKey: (key: string | undefined) => {
+      apiKey = key || undefined;
+      set(apiKey ? { ...state, connection: 'waiting' } : markDegraded(state));
+    },
     getState: () => state,
     flush: () => store.flush(),
     close: async () => { scheduler.stop(); await store.flush(); await new Promise<void>((r) => server.close(() => r())); },
   };
 }
 
-// Entry point: `tsx server/index.ts`
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+function serveStatic(dir: string, reqUrl: string, res: http.ServerResponse) {
+  const rel = decodeURIComponent(reqUrl.split('?')[0]);
+  const file = path.resolve(dir, '.' + (rel === '/' ? '/index.html' : rel));
+  if (!file.startsWith(path.resolve(dir) + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    res.writeHead(404); res.end(); return;
+  }
+  res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream' });
+  fs.createReadStream(file).pipe(res);
+}
+
+// Entry point: `tsx server/index.ts` (import.meta.url is empty when bundled into the app).
+if (import.meta.url && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const envFile = path.join(root, '.env');
   if (fs.existsSync(envFile)) process.loadEnvFile(envFile);

@@ -308,7 +308,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export function sessionStatus(state: PetState, now: number): { tone: StatusTone; text: string } {
   const ev = state.currentTurnEvidence;
   if (!state.activeSessionId) return { tone: 'idle', text: 'Not following a Claude session yet.' };
-  if (!ev || ev.events.length === 0) return { tone: 'idle', text: 'Connected. Waiting for your prompt.' };
+  if (!ev) return { tone: 'idle', text: 'Connected. Waiting for your prompt.' };
+  if (ev.events.length === 0) return { tone: 'working', text: 'Thinking about your prompt…' };
 
   const last = ev.events[ev.events.length - 1];
   const ended = last.kind === 'stop';

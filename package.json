@@ -13,16 +13,51 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "install-hooks": "node scripts/install-hooks.mjs",
-    "overlay": "electron electron/main.cjs"
+    "overlay": "BYTE_UI_URL=http://127.0.0.1:5173/ electron electron/main.cjs",
+    "app:bundle": "esbuild electron/backend.ts --bundle --platform=node --format=cjs --target=node22 --outfile=electron/backend.cjs --log-override:empty-import-meta=silent",
+    "app": "npm run build && npm run app:bundle && electron electron/main.cjs",
+    "app:dist": "npm run build && npm run app:bundle && electron-builder --mac --arm64"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "concurrently": "^9.0.0",
     "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "sharp": "^0.34.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "dev.byte.pet",
+    "productName": "Byte",
+    "files": [
+      "dist/**",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "electron/backend.cjs",
+      "scripts/claude-hook.mjs",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "scripts/claude-hook.mjs"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "identity": null,
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    }
   }
 }

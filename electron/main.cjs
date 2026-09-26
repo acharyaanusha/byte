@@ -1,19 +1,90 @@
 // Byte overlay: a small transparent, frameless, always-on-top window that floats
-// over your terminal or coding app. It loads the same UI in ?overlay mode.
-// Only Byte, its bubble and its XP bar catch the mouse; everything else clicks
-// through to the apps underneath. Drag Byte anywhere; right-click for the menu.
-const { app, BrowserWindow, ipcMain, Menu, screen, shell } = require('electron');
+// over your terminal or coding app. Only Byte, its bubble and its XP bar catch the
+// mouse; everything else clicks through to the apps underneath. Drag Byte anywhere;
+// right-click for the menu.
+//
+// Two modes:
+// - App (default, and the packaged Byte.app): runs the Byte server inside this
+//   process on 127.0.0.1:4317 and serves the built UI from dist/.
+// - Dev (BYTE_UI_URL set, as `npm run overlay` does): loads the Vite dev UI and
+//   uses the separately running `npm run dev` server.
+const { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } = require('electron');
 const path = require('node:path');
 
-const UI = process.env.BYTE_UI_URL ?? 'http://127.0.0.1:5173/';
+const DEV_UI = process.env.BYTE_UI_URL;
+const PORT = Number(process.env.BYTE_PORT ?? 4317);
+const UI = DEV_UI ?? `http://127.0.0.1:${PORT}/`;
 const W = 196, H = 150;
 /** Byte wanders at most this far either side of where you last put it. */
 const WANDER = 90;
 let win;
 let homeX = 0;
+let backend = null;   // app mode only: electron/backend.cjs
+let byte = null;      // app mode only: the embedded server
 
 /** First launch: bottom-right, just above the Dock. */
 const floorY = (workArea) => workArea.y + workArea.height - H;
+
+function startServer() {
+  backend = require('./backend.cjs');
+  const config = backend.readConfig();
+  byte = backend.createByte({
+    statePath: path.join(backend.BYTE_HOME, 'pet.json'),
+    apiKey: process.env.TYPESAFE_API_KEY || config.typesafeApiKey,
+    staticDir: path.join(__dirname, '..', 'dist'),
+    log: () => {},
+  });
+  return new Promise((resolve, reject) => {
+    byte.server.once('error', reject);
+    byte.server.listen(PORT, '127.0.0.1', resolve);
+  });
+}
+
+const hookSource = () => path.join(__dirname, '..', 'scripts', 'claude-hook.mjs').replace('app.asar', 'app.asar.unpacked');
+
+function setHooks(connect) {
+  try {
+    dialog.showMessageBox({ message: backend.setClaudeHooks(connect, hookSource(), process.execPath),
+      detail: connect ? 'New Claude Code sessions will show up in Byte. Already-running sessions may need a restart.' : '' });
+  } catch (err) {
+    dialog.showErrorBox('Byte could not update ~/.claude/settings.json', `${err.message}\n\nThe file was left untouched.`);
+  }
+}
+
+async function firstRun() {
+  const config = backend.readConfig();
+  if (config.askedToConnect || backend.hooksInstalled()) return;
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Connect', 'Not now'],
+    defaultId: 0,
+    message: 'Connect Byte to Claude Code?',
+    detail: 'Byte adds small async hooks to ~/.claude/settings.json (a backup is kept) so it can react to your Claude Code sessions. They never block or change what Claude does. You can disconnect from the right-click menu at any time.',
+  });
+  backend.writeConfig({ ...backend.readConfig(), askedToConnect: true });
+  if (response === 0) setHooks(true);
+}
+
+function keyWindow() {
+  const kw = new BrowserWindow({
+    width: 420, height: 210, resizable: false, minimizable: false, title: 'Jev API key',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true },
+  });
+  const html = `<!doctype html><meta charset="utf-8"><title>Jev API key</title>
+<body style="font:14px -apple-system,system-ui;margin:18px;color:#2c3a36;background:#fbf5e6">
+<p style="margin:0 0 10px">Byte uses <b>Jev</b> (TypeSafe) to decide milestones. Paste your TypeSafe API key. It is stored only on this Mac, in ~/.byte/config.json.</p>
+<form id="f"><input id="k" type="password" placeholder="TypeSafe API key" autofocus style="width:100%;padding:8px;box-sizing:border-box;border:1px solid #cdbf9c;border-radius:8px">
+<p style="text-align:right;margin:12px 0 0"><button type="submit" style="padding:7px 14px;border-radius:8px;border:0;background:#3e9d78;color:#fff;font-weight:600">Save</button></p></form>
+<script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();await window.byteHost.saveKey(document.getElementById('k').value.trim());window.close();};</script>`;
+  kw.setMenu(null);
+  kw.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+}
+
+ipcMain.handle('byte:saveKey', (_e, key) => {
+  if (!backend) return;
+  backend.writeConfig({ ...backend.readConfig(), typesafeApiKey: key || undefined });
+  byte.setApiKey(key || undefined);
+});
 
 function create() {
   const { workArea } = screen.getPrimaryDisplay();
@@ -33,12 +104,20 @@ function create() {
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadURL(`${UI}?overlay=1`);
   win.webContents.on('context-menu', () => {
+    const appItems = backend ? [
+      { type: 'separator' },
+      backend.hooksInstalled()
+        ? { label: 'Disconnect Claude Code (remove hooks)', click: () => setHooks(false) }
+        : { label: 'Connect Claude Code (install hooks)', click: () => setHooks(true) },
+      { label: 'Set Jev API key…', click: keyWindow },
+    ] : [];
     Menu.buildFromTemplate([
       { label: 'Open full view', click: () => shell.openExternal(UI) },
       { label: 'Replay demo / exit demo', click: () => win.webContents.send('byte:command', 'replay') },
-      { label: 'Disconnect from this Claude session', click: () => win.webContents.send('byte:command', 'disconnect') },
+      { label: 'Stop following this Claude session', click: () => win.webContents.send('byte:command', 'disconnect') },
+      ...appItems,
       { type: 'separator' },
-      { label: 'Quit Byte overlay', click: () => app.quit() },
+      { label: 'Quit Byte', click: () => app.quit() },
     ]).popup({ window: win });
   });
 }
@@ -71,5 +150,21 @@ ipcMain.handle('byte:moveBy', (_e, dx) => {
 });
 
 if (process.platform === 'darwin') app.dock?.hide();
-app.whenReady().then(create);
-app.on('window-all-closed', () => app.quit());
+if (!app.requestSingleInstanceLock()) app.quit();
+app.whenReady().then(async () => {
+  if (!DEV_UI) {
+    try {
+      await startServer();
+    } catch (err) {
+      dialog.showErrorBox('Byte could not start', err.code === 'EADDRINUSE'
+        ? `Port ${PORT} is already in use. Is another Byte (or \`npm run dev\`) running?`
+        : String(err.message ?? err));
+      app.quit();
+      return;
+    }
+    await firstRun();
+  }
+  create();
+});
+app.on('window-all-closed', () => { if (!win || win.isDestroyed()) app.quit(); });
+app.on('before-quit', () => { void byte?.close(); });

@@ -10,5 +10,5 @@
     "allowJs": false,
     "types": ["node", "vite/client"]
   },
-  "include": ["server", "shared", "src", "tests", "scripts/*.d.mts", "vite.config.ts"]
+  "include": ["server", "shared", "src", "tests", "electron/*.ts", "scripts/*.d.mts", "vite.config.ts"]
 }

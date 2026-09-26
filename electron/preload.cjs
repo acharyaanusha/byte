@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('byteHost', {
   dragStart: () => ipcRenderer.send('byte:dragStart'),
   dragMove: (dx, dy) => ipcRenderer.send('byte:dragMove', dx, dy),
   dragEnd: () => ipcRenderer.send('byte:dragEnd'),
+  saveKey: (key) => ipcRenderer.invoke('byte:saveKey', key),
 });

@@ -42,9 +42,18 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 - **Supported checks:** `npm test`, `npm run test`, `npm run typecheck`. A passing run must also show recognizable output (node:test, vitest or jest summaries; no `error TS` for typecheck). Compound shell commands (`&&`, `|`, `;` …) can change Byte's mood but can't earn XP.
 - **What Jev sees:** the prompt excerpt (≤ 500 chars) and the turn's last 12 events, with command output tails of ≤ 500 chars each and ≤ 8,000 chars in total. File contents, environment and anything that looks like a key are left out. The prompt tells Jev to treat all of it as evidence, not instructions.
 
-## Setup
+## Install (macOS, Apple Silicon)
 
-Requires Node 22+ and Claude Code.
+1. Download **Byte-0.1.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
+3. Byte asks to **connect to Claude Code**. It adds small async hooks to `~/.claude/settings.json` and keeps a backup. Start a new Claude Code session and Byte follows it.
+4. Right-click Byte → **Set Jev API key…** and paste your [TypeSafe](https://docs.typesafe.ai) key. Without a key, Byte still reacts but awards no XP.
+
+Everything runs locally: the app hosts Byte's server on `127.0.0.1:4317`, keeps your pet in `~/.byte/pet.json` and your key in `~/.byte/config.json` (readable only by you). The hooks run with the app's own runtime, so you don't need Node. To disconnect, use right-click → **Disconnect Claude Code**.
+
+## Develop from source
+
+Requires Node 22+ and Claude Code. `npm run app` runs the full app locally; `npm run app:dist` builds the `.dmg`.
 
 ```bash
 npm install

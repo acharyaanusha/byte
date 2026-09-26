@@ -11,7 +11,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), 'claude-hook.mjs');
+// import.meta.url is empty when this file is bundled into the app (which passes its own path).
+const HOOK = import.meta.url ? path.join(path.dirname(fileURLToPath(import.meta.url)), 'claude-hook.mjs') : '';
 const MARKER = 'claude-hook.mjs';
 const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'Notification'];
 const TOOL_EVENTS = new Set(['PostToolUse', 'PostToolUseFailure']);
@@ -21,7 +22,7 @@ export function isByteHook(h) {
 }
 
 /** Returns settings with Byte's entries removed (and, unless removing, re-added). Pure. */
-export function mergeHooks(settings, { remove = false, hookPath = HOOK } = {}) {
+export function mergeHooks(settings, { remove = false, hookPath = HOOK, command } = {}) {
   const next = structuredClone(settings);
   next.hooks ??= {};
   for (const event of Object.keys(next.hooks)) {
@@ -36,7 +37,7 @@ export function mergeHooks(settings, { remove = false, hookPath = HOOK } = {}) {
     for (const event of EVENTS) {
       const group = {
         ...(TOOL_EVENTS.has(event) ? { matcher: 'Read|Grep|Glob|Edit|Write|Bash' } : {}),
-        hooks: [{ type: 'command', command: `node ${JSON.stringify(hookPath)}`, async: true, timeout: 5 }],
+        hooks: [{ type: 'command', command: command ?? `node ${JSON.stringify(hookPath)}`, async: true, timeout: 5 }],
       };
       next.hooks[event] = [...(next.hooks[event] ?? []), group];
     }
@@ -85,4 +86,4 @@ function main() {
   console.log(flag === '--remove' ? 'Removed Byte hooks.' : `Installed Byte hooks. Restart Claude Code${global ? ' sessions' : ' in that repo'} to pick them up.`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (import.meta.url && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
