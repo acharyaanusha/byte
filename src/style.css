@@ -82,9 +82,9 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .flip { display: block; transform-origin: 50% 50%; }
 .pet img { image-rendering: pixelated; }
 .pet[data-behavior='idle'] img { animation: breathe 3.2s ease-in-out infinite; }
-/* Walk bob: up on the passing frame, down on the contact frames. */
+/* Walk bob: a slight rise on the passing frame. */
 .pet[data-pose^='walk'] img, .pet[data-pose='sit'] img, .pet[data-pose='wave'] img { animation: none; }
-.pet[data-pose='walkpass'] img { transform: translateY(-4px); }
+.pet[data-pose^='walkpass'] img { transform: translateY(-1px); }
 .pet[data-behavior='puzzled'] img { animation: ponder 2.4s ease-in-out infinite; }
 .pet[data-behavior='puzzled'] .puzzle { opacity: 1; animation: pop 2.4s ease-in-out infinite; }
 .pet[data-behavior='celebrating'][data-pose='jump'] img { transform: translateY(-22px); }

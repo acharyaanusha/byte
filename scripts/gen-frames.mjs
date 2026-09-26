@@ -102,9 +102,14 @@ async function place(trimmed, scale, file) {
 async function finishStage(stage) {
   const idle = await keyed(await fs.readFile(path.join(RAW, `${stage}-idle.png`)));
   const scale = IDLE_H / (await sharp(idle).metadata()).height;
-  for (const pose of ['idle', ...Object.keys(POSES)]) {
+  // Walk frames come from one sprite sheet (scripts/gen-walk.mjs) at a different resolution:
+  // they share one scale, from walk1, so the cycle keeps its bob and matches Byte's size.
+  const walk1 = await keyed(await fs.readFile(path.join(RAW, `${stage}-walk1.png`)));
+  const walkScale = (IDLE_H * 0.97) / (await sharp(walk1).metadata()).height;
+  for (const pose of ['idle', ...Object.keys(POSES), 'walkpass2']) {
     const raw = path.join(RAW, `${stage}-${pose}.png`);
-    try { await place(await keyed(await fs.readFile(raw)), scale, path.join(OUT, `${stage}-${pose}.png`)); }
+    const s = pose.startsWith('walk') ? walkScale : scale;
+    try { await place(await keyed(await fs.readFile(raw)), s, path.join(OUT, `${stage}-${pose}.png`)); }
     catch { console.log(`  missing ${stage}-${pose}`); }
   }
 }

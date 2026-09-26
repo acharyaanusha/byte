@@ -1,12 +1,13 @@
 // Frame-based pet animation. A small state machine picks what Byte is doing
 // (standing, looking around, sitting, walking, turning, waving for you) and
-// which pixel-art frame to show. Walking is a 4-frame cycle that only advances
-// on the contact frames, so steps look planted instead of gliding. In the
+// which pixel-art frame to show. Walking is a 4-frame cycle (contact, passing,
+// contact, passing) while the body moves continuously at a speed matched to the
+// stride, the way sprite games do it; moving in jumps on some frames reads as floating. In the
 // browser Byte walks inside the habitat; in the overlay the host (Electron)
 // moves the window a short way around the spot where you put it.
 import type { Behavior, Stage } from '../shared/types.js';
 
-type Pose = 'idle' | 'blink' | 'walk1' | 'walk2' | 'walkpass' | 'jump' | 'puzzled' | 'sleep' | 'wave' | 'sit';
+type Pose = 'idle' | 'blink' | 'walk1' | 'walk2' | 'walkpass' | 'walkpass2' | 'jump' | 'puzzled' | 'sleep' | 'wave' | 'sit';
 type Activity = 'stand' | 'look' | 'sit' | 'walk' | 'turn' | 'greet';
 
 declare global {
@@ -22,12 +23,13 @@ declare global {
   }
 }
 
-const POSES: Pose[] = ['idle', 'blink', 'walk1', 'walk2', 'walkpass', 'jump', 'puzzled', 'sleep', 'wave', 'sit'];
-/** Contact, passing, contact, passing. Byte only moves on contact frames. */
-const WALK: Pose[] = ['walk1', 'walkpass', 'walk2', 'walkpass'];
-const TICK_MS = 60;
-const WALK_FRAME_MS = 150;
-const STEP_PX = 10;
+const POSES: Pose[] = ['idle', 'blink', 'walk1', 'walk2', 'walkpass', 'walkpass2', 'jump', 'puzzled', 'sleep', 'wave', 'sit'];
+/** Contact, passing, contact, passing. */
+const WALK: Pose[] = ['walk1', 'walkpass', 'walk2', 'walkpass2'];
+const TICK_MS = 33;
+const WALK_FRAME_MS = 140;
+/** Body speed: about one stride (~12 px at overlay size) per contact frame. */
+const WALK_PX_PER_S = 40;
 const HABITAT_RANGE = 80;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 /** prefers-reduced-motion: no walking (which moves the whole overlay window) and no looping frames. */
@@ -42,6 +44,8 @@ export class PetAnimator {
   private facing: -1 | 1 = -1;    // -1 = facing/heading left (how the frames are drawn)
   private walkIndex = 0;
   private nextFrameAt = 0;
+  private lastMoveAt = 0;
+  private carry = 0;              // sub-pixel movement not yet applied
   private x = 0;                  // habitat offset when not in the overlay
   private waveUntil = 0;
   private blinkUntil = 0;
@@ -135,15 +139,21 @@ export class PetAnimator {
     const walking = !calm() && this.activity === 'walk'
       && !this.held && !this.hovered && now >= this.waveUntil
       && this.mode !== 'sleeping' && this.mode !== 'celebrating' && (this.mode !== 'puzzled' || this.attention);
-    if (walking && now >= this.nextFrameAt && !this.moving) {
+    if (walking && now >= this.nextFrameAt) {
       this.nextFrameAt = now + WALK_FRAME_MS;
       this.walkIndex = (this.walkIndex + 1) % WALK.length;
-      if (WALK[this.walkIndex] !== 'walkpass') await this.advance(STEP_PX, now);
+    }
+    const dt = Math.min(100, now - this.lastMoveAt);
+    this.lastMoveAt = now;
+    if (walking && !this.moving) {
+      this.carry += (WALK_PX_PER_S * dt) / 1000;
+      const px = Math.floor(this.carry);
+      if (px >= 1) { this.carry -= px; await this.advance(px, now); }
     }
     this.render(now);
   }
 
-  /** Moves one step on a contact frame. Turns around at the edges. */
+  /** Moves the body a few pixels. Turns around at the edges. */
   private async advance(px: number, now: number) {
     const host = window.byteHost;
     if (host) {
