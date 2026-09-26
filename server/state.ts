@@ -13,7 +13,7 @@ const MAX_RECENT = 12;
 const MAX_HISTORY = 20;
 
 export const CAPTIONS = {
-  hello: 'Hi! I’m Byte.',
+  hello: 'Hi! I’m Pico.',
   prompt: 'Ooh, a new task.',
   read: 'Reading along…',
   edit: 'Watching the code change.',
@@ -165,7 +165,7 @@ const NOTIFY_DUP_MS = 2000;
 const WORK = new Set(['prompt', 'read', 'edit', 'command_ok', 'command_failed']);
 
 /**
- * Applies one normalized event. Byte follows one session at a time: the one you
+ * Applies one normalized event. Pico follows one session at a time: the one you
  * last typed a prompt into (or a newly started session once the bound one has
  * been quiet for TAKEOVER_MS). Tool events from other sessions are ignored.
  * Drops duplicates and tracks the current turn's evidence in hook-time order.
@@ -293,7 +293,7 @@ export function disconnect(state: PetState): PetState {
   return { ...state, activeSessionId: null, currentTurnEvidence: null, needsYou: null, behavior: 'idle', caption: CAPTIONS.hello };
 }
 
-/** Should Byte ask for you? An explicit notification, or a fresh Jev judgment saying so. */
+/** Should Pico ask for you? An explicit notification, or a fresh Jev judgment saying so. */
 export function needsYou(state: PetState): boolean {
   if (state.needsYou) return true;
   const j = state.lastJudgment;

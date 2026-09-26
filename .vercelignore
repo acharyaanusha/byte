@@ -1,4 +1,5 @@
 release/
+.pico/
 .byte/
 node_modules/
 dist/

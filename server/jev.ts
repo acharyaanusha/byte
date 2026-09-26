@@ -74,7 +74,8 @@ type Fetch = typeof fetch;
 /** A personal key calls TypeSafe directly; otherwise the shared proxy asks the same questions for you. */
 export interface JudgeOptions { apiKey?: string; proxyUrl?: string; timeoutMs?: number; fetchImpl?: Fetch }
 
-/** Byte's shared Jev proxy (proxy/handler.ts deployed on Vercel). */
+/** Pico's shared Jev proxy (proxy/handler.ts deployed on Vercel). */
+// Deployed before the rename from Byte; released apps call this URL, so it stays.
 export const DEFAULT_PROXY_URL = 'https://byte-jev.vercel.app/api/judge';
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null);

@@ -1,13 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('byteHost', {
-  moveBy: (dx) => ipcRenderer.invoke('byte:moveBy', dx),
-  onCommand: (cb) => ipcRenderer.on('byte:command', (_e, cmd) => cb(cmd)),
-  setInteractive: (on) => ipcRenderer.send('byte:interactive', on),
-  dragStart: () => ipcRenderer.send('byte:dragStart'),
-  dragMove: (dx, dy) => ipcRenderer.send('byte:dragMove', dx, dy),
-  dragEnd: () => ipcRenderer.send('byte:dragEnd'),
-  saveKey: (key) => ipcRenderer.invoke('byte:saveKey', key),
-  answer: (i) => ipcRenderer.send('byte:answer', i),
-  openFullView: () => ipcRenderer.send('byte:openFull'),
+contextBridge.exposeInMainWorld('picoHost', {
+  moveBy: (dx) => ipcRenderer.invoke('pico:moveBy', dx),
+  onCommand: (cb) => ipcRenderer.on('pico:command', (_e, cmd) => cb(cmd)),
+  setInteractive: (on) => ipcRenderer.send('pico:interactive', on),
+  dragStart: () => ipcRenderer.send('pico:dragStart'),
+  dragMove: (dx, dy) => ipcRenderer.send('pico:dragMove', dx, dy),
+  dragEnd: () => ipcRenderer.send('pico:dragEnd'),
+  saveKey: (key) => ipcRenderer.invoke('pico:saveKey', key),
+  answer: (i) => ipcRenderer.send('pico:answer', i),
+  openFullView: () => ipcRenderer.send('pico:openFull'),
 });

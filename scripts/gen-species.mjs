@@ -1,5 +1,5 @@
-// Generates a whole pet type ("species") in Byte's 16-bit pixel style with an OpenRouter
-// image model: a hatchling drawn from a text description using Byte as the style
+// Generates a whole pet type ("species") in Pico's 16-bit pixel style with an OpenRouter
+// image model: a hatchling drawn from a text description using Pico as the style
 // reference, sprout and companion stages as edits of it, 7 poses per stage as edits of
 // each stage, and a 4-frame walk cycle per stage drawn as ONE sprite sheet (frames
 // generated separately collapse into near-identical images). Frames are keyed off
@@ -12,7 +12,7 @@ import sharp from 'sharp';
 const KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = process.env.SPRITE_MODEL ?? 'google/gemini-3-pro-image';
 const [species, flag] = process.argv.slice(2);
-const RAW = path.resolve('.byte/species-raw', species);
+const RAW = path.resolve('.pico/species-raw', species);
 const OUT = path.resolve('public/pet', species);
 const STYLE_REF = path.resolve('public/pet/dragon/hatchling-idle.png');
 const CANVAS_W = 384, CANVAS_H = 256, GROUND = 244, IDLE_H = 200;

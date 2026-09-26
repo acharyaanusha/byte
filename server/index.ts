@@ -9,7 +9,7 @@ import { applyJudgment, disconnect, initialState, markDegraded, publicState, red
 import { loadState, Store } from './store.js';
 import type { PetJudgment, PetState } from '../shared/types.js';
 
-export interface ByteOptions {
+export interface PicoOptions {
   statePath: string;
   apiKey?: string;
   judgeImpl?: typeof judge;
@@ -28,8 +28,8 @@ const TYPES: Record<string, string> = {
   '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.ico': 'image/x-icon',
 };
 
-export function createByte(opts: ByteOptions) {
-  const log = opts.log ?? ((m: string) => console.log(`[byte] ${m}`));
+export function createPico(opts: PicoOptions) {
+  const log = opts.log ?? ((m: string) => console.log(`[pico] ${m}`));
   const store = new Store(opts.statePath);
   let state: PetState = loadState(opts.statePath) ?? initialState();
   let apiKey = opts.apiKey;
@@ -125,7 +125,7 @@ export function createByte(opts: ByteOptions) {
   };
 }
 
-/** BYTE_JEV_PROXY: unset → the shared proxy, "off" → none, anything else → that URL. */
+/** PICO_JEV_PROXY (or the older BYTE_JEV_PROXY): unset → the shared proxy, "off" → none, anything else → that URL. */
 export function resolveProxy(env: string | undefined): string | undefined {
   if (env === 'off') return undefined;
   return env || DEFAULT_PROXY_URL;
@@ -146,11 +146,11 @@ if (import.meta.url && process.argv[1] && path.resolve(process.argv[1]) === file
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const envFile = path.join(root, '.env');
   if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
-  const port = Number(process.env.BYTE_PORT ?? 4317);
+  const port = Number(process.env.PICO_PORT ?? process.env.BYTE_PORT ?? 4317);
   const apiKey = process.env.TYPESAFE_API_KEY || undefined;
-  const proxyUrl = resolveProxy(process.env.BYTE_JEV_PROXY);
-  const byte = createByte({ statePath: path.join(root, '.byte', 'pet.json'), apiKey, proxyUrl });
-  byte.server.listen(port, '127.0.0.1', () => {
-    console.log(`[byte] listening on http://127.0.0.1:${port}  jev=${apiKey ? 'own key' : proxyUrl ? `shared proxy ${proxyUrl}` : 'OFF (degraded)'}`);
+  const proxyUrl = resolveProxy(process.env.PICO_JEV_PROXY ?? process.env.BYTE_JEV_PROXY);
+  const pico = createPico({ statePath: path.join(root, '.pico', 'pet.json'), apiKey, proxyUrl });
+  pico.server.listen(port, '127.0.0.1', () => {
+    console.log(`[pico] listening on http://127.0.0.1:${port}  jev=${apiKey ? 'own key' : proxyUrl ? `shared proxy ${proxyUrl}` : 'OFF (degraded)'}`);
   });
 }

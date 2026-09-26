@@ -76,7 +76,7 @@ function renderMilestones(list: MilestoneRecord[], now: number) {
   const last = list.slice(-3).reverse();
   el.milestones.innerHTML = last.length
     ? last.map((m) => `<li><span class="pts">+${m.xp}</span><span>${MILESTONE_LABEL[m.kind]} · <code>${escape(m.check)}</code></span><span class="when">${ago(m.at, now)}</span></li>`).join('')
-    : '<li class="empty">None yet. Fix a failing test to feed Byte.</li>';
+    : '<li class="empty">None yet. Fix a failing test to feed Pico.</li>';
 }
 
 function renderDetails(s: PublicState, now: number) {
@@ -123,7 +123,7 @@ function render() {
     el.conn.dataset.conn = el.connMini.dataset.conn = 'offline';
     el.connLabel.textContent = el.connMini.title = 'Server offline';
     el.caption.dataset.tone = 'failing';
-    el.caption.textContent = 'Byte server is offline. Start it with npm run dev.';
+    el.caption.textContent = 'Pico server is offline. Start it with npm run dev.';
     el.caption.classList.add('show');
     return;
   }
@@ -132,7 +132,7 @@ function render() {
   const conn = offline && !replaying ? 'offline' : s.connection;
   el.conn.dataset.conn = el.connMini.dataset.conn = replaying ? 'live' : conn;
   el.connLabel.textContent = el.connMini.title = replaying ? 'Demo' : { live: 'Jev live', degraded: 'Degraded · no XP', waiting: 'Waiting', offline: 'Server offline' }[conn];
-  el.conn.title = conn === 'degraded' ? 'Jev unavailable: Byte still reacts, but awards no XP.' : '';
+  el.conn.title = conn === 'degraded' ? 'Jev unavailable: Pico still reacts, but awards no XP.' : '';
   el.otherBanner.hidden = replaying || !s.otherSessionAt || now - s.otherSessionAt > 15_000;
 
   // Appearance (the demo replay keeps whatever you picked)
@@ -164,7 +164,7 @@ function render() {
 
   if (offline && !replaying) {
     el.caption.dataset.tone = 'failing';
-    el.caption.textContent = 'Byte server is offline. Start it with npm run dev.';
+    el.caption.textContent = 'Pico server is offline. Start it with npm run dev.';
   } else {
   // Caption: a quick reaction right after something happens, otherwise how the session is going.
   const reacting = now - s.lastEventAt < REACTION_MS || now < s.celebrateUntil;
@@ -319,11 +319,11 @@ async function saveAppearance(next: Partial<Appearance>) {
 // Overlay: the ✎ button in the XP pill opens the full view's gallery (no right-click needed).
 el.customizeBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  if (window.byteHost?.openFullView) window.byteHost.openFullView();
+  if (window.picoHost?.openFullView) window.picoHost.openFullView();
   else document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
 });
 
-window.byteHost?.onCommand?.((cmd) => {
+window.picoHost?.onCommand?.((cmd) => {
   if (cmd.startsWith('species:')) void saveAppearance({ species: cmd.slice(8) as Species });
   if (cmd.startsWith('color:')) void saveAppearance({ color: cmd.slice(6) as ColorName });
   if (cmd === 'replay') toggleReplay();
@@ -344,9 +344,9 @@ el.disconnect.addEventListener('click', async () => {
   void poll();
 });
 
-// Overlay host: capture the mouse only over Byte's visible parts, and drag the window by them.
+// Overlay host: capture the mouse only over Pico's visible parts, and drag the window by them.
 let justDragged = false;
-const host = window.byteHost;
+const host = window.picoHost;
 if (overlay && host?.setInteractive) {
   const handles = ['#pet', '#caption', '.xp', '#demo-banner'];
   const isHandle = (t: EventTarget | null) => t instanceof Element && handles.some((h) => t.closest(h));

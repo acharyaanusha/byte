@@ -77,7 +77,7 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .puzzle { top: 18px; right: 34px; font-size: 26px; color: var(--mint-deep); }
 
 /* Behaviors: the frames carry the pose; CSS adds weight and bounce. */
-/* No transition: Byte moves in discrete steps on contact frames, so its feet stay planted. */
+/* No transition: Pico moves in discrete steps on contact frames, so its feet stay planted. */
 .pet { transform: translateX(var(--walk-x, 0px)); }
 .flip { display: block; transform-origin: 50% 50%; }
 .pet img { image-rendering: pixelated; }
@@ -174,7 +174,7 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .stage-card.locked figcaption { color: #9a9486; }
 html.overlay .gallery { display: none; }
 
-/* Overlay ✎ button: shown in the XP pill while hovering Byte. */
+/* Overlay ✎ button: shown in the XP pill while hovering Pico. */
 .customize-btn { display: none; }
 html.overlay .customize-btn {
   order: 3; width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
@@ -182,7 +182,7 @@ html.overlay .customize-btn {
 }
 html.overlay .app:hover .customize-btn { display: inline-block; }
 
-/* Overlay mode (?overlay): a small Byte, a thin XP bar, and a speech bubble that only shows when
+/* Overlay mode (?overlay): a small Pico, a thin XP bar, and a speech bubble that only shows when
    something changes, when Claude needs you or looks stuck, or on hover. Keep the footprint small. */
 html.overlay, html.overlay body { background: transparent; }
 html.overlay .app { background: transparent; min-height: 0; max-width: none; height: 100vh; padding: 0 4px 4px; gap: 3px; align-items: center; justify-content: flex-end; overflow: hidden; }

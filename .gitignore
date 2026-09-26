@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.pico/
 .byte/
 .env
 *.tmp

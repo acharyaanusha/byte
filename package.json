@@ -1,9 +1,9 @@
 {
-  "name": "byte",
-  "version": "0.3.2",
+  "name": "pico",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Byte: a coding tamagotchi that grows with every little breakthrough.",
+  "description": "Pico: a coding tamagotchi that grows with every little breakthrough.",
   "scripts": {
     "dev": "concurrently -k -n server,web \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",
@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "install-hooks": "node scripts/install-hooks.mjs",
-    "overlay": "BYTE_UI_URL=http://127.0.0.1:5173/ electron electron/main.cjs",
+    "overlay": "PICO_UI_URL=http://127.0.0.1:5173/ electron electron/main.cjs",
     "app:bundle": "esbuild electron/backend.ts --bundle --platform=node --format=cjs --target=node22 --outfile=electron/backend.cjs --log-override:empty-import-meta=silent",
     "app": "npm run build && npm run app:bundle && electron electron/main.cjs",
     "app:dist": "npm run build && npm run app:bundle && electron-builder --mac --arm64"
@@ -31,18 +31,20 @@
   },
   "main": "electron/main.cjs",
   "build": {
-    "appId": "dev.byte.pet",
-    "productName": "Byte",
+    "appId": "dev.pico.pet",
+    "productName": "Pico",
     "files": [
       "dist/**",
       "electron/main.cjs",
       "electron/preload.cjs",
       "electron/backend.cjs",
       "package.json",
-      "scripts/byte-hook.mjs",
-      "scripts/claude-hook.mjs"
+      "scripts/pico-hook.mjs",
+      "scripts/claude-hook.mjs",
+      "scripts/byte-hook.mjs"
     ],
     "asarUnpack": [
+      "scripts/pico-hook.mjs",
       "scripts/byte-hook.mjs",
       "scripts/claude-hook.mjs"
     ],

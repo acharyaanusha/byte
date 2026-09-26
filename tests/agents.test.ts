@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeHook } from '../server/claude.js';
 import { initialState, reduceEvent, sessionStatus } from '../server/state.js';
-import { AGENTS, mergeHooks } from '../scripts/install-hooks.mjs';
+import { AGENTS, isPicoHook, mergeHooks } from '../scripts/install-hooks.mjs';
 import type { PetEvent, PetState } from '../shared/types.js';
 import codexReal from '../fixtures/codex-0.155.1-hooks.json';
 import codexTools from '../fixtures/codex-tool-events.json';
@@ -63,8 +63,8 @@ describe('installer per agent', () => {
   it('writes each agent\'s own events and handler shape, idempotently, preserving other hooks', () => {
     const existing = { hooks: { Stop: [{ hooks: [{ type: 'command', command: './mine.sh' }] }] } };
     for (const agent of ['claude', 'codex', 'gemini'] as const) {
-      const once = mergeHooks(existing, { agent, hookPath: '/x/byte/scripts/byte-hook.mjs' });
-      expect(mergeHooks(once, { agent, hookPath: '/x/byte/scripts/byte-hook.mjs' })).toEqual(once);
+      const once = mergeHooks(existing, { agent, hookPath: '/x/pico/scripts/pico-hook.mjs' });
+      expect(mergeHooks(once, { agent, hookPath: '/x/pico/scripts/pico-hook.mjs' })).toEqual(once);
       for (const ev of AGENTS[agent].events) expect(once.hooks[ev]).toBeDefined();
       const handler = once.hooks[AGENTS[agent].events[1]][0].hooks[0];
       expect(handler.command).toContain(`--agent ${agent}`);
@@ -73,5 +73,18 @@ describe('installer per agent', () => {
       if (agent !== 'gemini') expect(once.hooks.Stop[0].hooks[0].command).toBe('./mine.sh');
       expect(mergeHooks(once, { agent, remove: true })).toEqual(existing);
     }
+  });
+});
+
+describe('rename from Byte', () => {
+  it('recognizes hooks installed under the old name, so reinstalling replaces them instead of duplicating', () => {
+    expect(isPicoHook({ command: 'node "/Users/x/Projects/byte/scripts/claude-hook.mjs"' })).toBe(true);
+    expect(isPicoHook({ command: 'ELECTRON_RUN_AS_NODE=1 "/A/Byte.app/Contents/MacOS/Byte" "/Users/x/.byte/byte-hook.mjs" --agent codex' })).toBe(true);
+    expect(isPicoHook({ command: 'node "/Users/x/.pico/pico-hook.mjs" --agent gemini' })).toBe(true);
+    expect(isPicoHook({ command: './mine.sh' })).toBe(false);
+    const old = { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node "/x/byte/scripts/claude-hook.mjs"' }] }] } };
+    const next = mergeHooks(old, { agent: 'claude', hookPath: '/x/pico/scripts/pico-hook.mjs' });
+    expect(next.hooks.Stop).toHaveLength(1);
+    expect(next.hooks.Stop[0].hooks[0].command).toContain('pico-hook.mjs');
   });
 });

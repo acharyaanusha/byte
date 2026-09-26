@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Installs (or removes) Byte's hooks for a coding agent: Claude Code, Codex CLI or Gemini CLI.
-// Merges only Byte's entries, preserves everything else, backs up the file, and is idempotent.
+// Installs (or removes) Pico's hooks for a coding agent: Claude Code, Codex CLI or Gemini CLI.
+// Merges only Pico's entries, preserves everything else, backs up the file, and is idempotent.
 //   node scripts/install-hooks.mjs --global [--agent claude|codex|gemini] [--remove]
 //       every session of that agent (~/.claude/settings.json, ~/.codex/hooks.json, ~/.gemini/settings.json)
 //   node scripts/install-hooks.mjs <repo> [--agent claude|codex|gemini] [--remove]
@@ -12,10 +12,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // import.meta.url is empty when this file is bundled into the app (which passes its own path).
-const HOOK = import.meta.url ? path.join(path.dirname(fileURLToPath(import.meta.url)), 'byte-hook.mjs') : '';
+const HOOK = import.meta.url ? path.join(path.dirname(fileURLToPath(import.meta.url)), 'pico-hook.mjs') : '';
 
 /**
- * Per agent: where its hooks live, which events Byte listens to, and the handler shape it accepts.
+ * Per agent: where its hooks live, which events Pico listens to, and the handler shape it accepts.
  * Codex doesn't support async command hooks, so its handler is a plain command; the hook itself
  * gives up after 300 ms. Gemini timeouts are in milliseconds.
  */
@@ -45,22 +45,23 @@ export const AGENTS = {
     repoFile: 'settings.json',
     events: ['SessionStart', 'BeforeAgent', 'AfterTool', 'AfterAgent', 'Notification'],
     matchers: { AfterTool: 'run_shell_command|replace|write_file|read_file|read_many_files|glob|search_file_content|grep|list_directory' },
-    handler: (command) => ({ type: 'command', name: 'byte', command, timeout: 5000 }),
+    handler: (command) => ({ type: 'command', name: 'pico', command, timeout: 5000 }),
   },
 };
 
-export function isByteHook(h) {
+/** Pico's own hook entries, including ones installed when the project was called Byte. */
+export function isPicoHook(h) {
   const c = h?.command;
-  return typeof c === 'string' && c.includes('byte') && (c.includes('byte-hook.mjs') || c.includes('claude-hook.mjs'));
+  return typeof c === 'string' && /pico|byte/.test(c) && /(pico-hook|byte-hook|claude-hook)\.mjs/.test(c);
 }
 
-/** The config file Byte's hooks go in for this agent, globally or for one repo. */
+/** The config file Pico's hooks go in for this agent, globally or for one repo. */
 export function hookTarget(agent, repo) {
   const a = AGENTS[agent];
   return repo ? path.resolve(repo, a.dir, a.repoFile) : path.join(os.homedir(), a.dir, a.globalFile);
 }
 
-/** Returns settings with Byte's entries removed (and, unless removing, re-added). Pure. */
+/** Returns settings with Pico's entries removed (and, unless removing, re-added). Pure. */
 export function mergeHooks(settings, { agent = 'claude', remove = false, hookPath = HOOK, command } = {}) {
   const a = AGENTS[agent];
   const next = structuredClone(settings);
@@ -68,7 +69,7 @@ export function mergeHooks(settings, { agent = 'claude', remove = false, hookPat
   for (const event of Object.keys(next.hooks)) {
     const groups = Array.isArray(next.hooks[event]) ? next.hooks[event] : [];
     const kept = groups
-      .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !isByteHook(h)) }))
+      .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !isPicoHook(h)) }))
       .filter((g) => g.hooks.length > 0);
     if (kept.length) next.hooks[event] = kept;
     else delete next.hooks[event];
@@ -100,12 +101,12 @@ export function writeHooks(target, opts) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   let note = '';
   if (original !== null) {
-    const backup = `${target}.byte-backup-${Date.now()}`;
+    const backup = `${target}.pico-backup-${Date.now()}`;
     fs.writeFileSync(backup, original);
     note = ` Backup: ${backup}`;
   }
   fs.writeFileSync(target, out);
-  return (opts.remove ? 'Removed Byte hooks.' : 'Installed Byte hooks.') + note;
+  return (opts.remove ? 'Removed Pico hooks.' : 'Installed Pico hooks.') + note;
 }
 
 function main() {
@@ -129,7 +130,7 @@ function main() {
   }
   if (!remove) {
     console.log(`Restart ${AGENTS[agent].label} to pick them up.`);
-    if (agent === 'codex') console.log('Codex asks you to trust new hooks before running them; approve Byte\'s when it asks.');
+    if (agent === 'codex') console.log('Codex asks you to trust new hooks before running them; approve Pico\'s when it asks.');
   }
 }
 

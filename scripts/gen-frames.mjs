@@ -1,4 +1,4 @@
-// Generates Byte's animation frames (pixel-art style) with an OpenRouter image model.
+// Generates Pico's animation frames (pixel-art style) with an OpenRouter image model.
 // 1. Stage bases: hatchling (the chosen reference) → sprout (+ small wings) → companion (+ big wings, gold star).
 // 2. Per stage, each pose is an edit of that stage's base, so the character stays consistent.
 // Frames are keyed off magenta and placed on a shared 256x256 canvas: one scale per stage
@@ -10,7 +10,7 @@ import sharp from 'sharp';
 
 const KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = process.env.SPRITE_MODEL ?? 'google/gemini-3-pro-image';
-const RAW = path.resolve('.byte/frames-raw');
+const RAW = path.resolve('.pico/frames-raw');
 const OUT = path.resolve('public/pet/frames');
 // Wide canvas so the companion's wings never shrink its body.
 const CANVAS_W = 384, CANVAS_H = 256, GROUND = 244, IDLE_H = 200;
@@ -103,7 +103,7 @@ async function finishStage(stage) {
   const idle = await keyed(await fs.readFile(path.join(RAW, `${stage}-idle.png`)));
   const scale = IDLE_H / (await sharp(idle).metadata()).height;
   // Walk frames come from one sprite sheet (scripts/gen-walk.mjs) at a different resolution:
-  // they share one scale, from walk1, so the cycle keeps its bob and matches Byte's size.
+  // they share one scale, from walk1, so the cycle keeps its bob and matches Pico's size.
   const walk1 = await keyed(await fs.readFile(path.join(RAW, `${stage}-walk1.png`)));
   const walkScale = (IDLE_H * 0.97) / (await sharp(walk1).metadata()).height;
   for (const pose of ['idle', ...Object.keys(POSES), 'walkpass2']) {

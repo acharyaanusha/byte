@@ -34,7 +34,7 @@ export class Store {
       const tmp = `${this.file}.${process.pid}.tmp`;
       await fs.promises.writeFile(tmp, JSON.stringify(snapshot, null, 2));
       await fs.promises.rename(tmp, this.file);
-    }).catch((err) => console.error(`[byte] save failed: ${(err as Error).message}`));
+    }).catch((err) => console.error(`[pico] save failed: ${(err as Error).message}`));
   }
 
   flush(): Promise<void> { return this.chain; }

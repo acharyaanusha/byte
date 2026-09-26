@@ -55,7 +55,7 @@ export function looksFailing(check: string, output: string): boolean {
 }
 
 /**
- * A shell command as a Byte event. `failed` is the agent's own verdict when it has one
+ * A shell command as a Pico event. `failed` is the agent's own verdict when it has one
  * (Claude's failure hook, Gemini's exit code); Codex reports only the output text, so
  * for supported checks the verdict comes from the output, and other commands count as ok.
  */
@@ -118,7 +118,7 @@ function codexEvent(raw: Raw, hook: string): Translated {
 const GEMINI_READ = new Set(['read_file', 'read_many_files', 'glob', 'search_file_content', 'grep', 'list_directory']);
 const GEMINI_EDIT = new Set(['replace', 'write_file']);
 
-/** Gemini CLI: no turn ids (Byte starts a turn at each prompt); shell results carry "Exit Code: N". */
+/** Gemini CLI: no turn ids (Pico starts a turn at each prompt); shell results carry "Exit Code: N". */
 function geminiEvent(raw: Raw, hook: string): Translated {
   const hookTs = typeof raw.hook_ts === 'number' ? raw.hook_ts : Date.now();
   const done = (kind: EventKind, extra: Partial<PetEvent> = {}, turnId: string | null = null) => ({ kind, extra, turnId });
@@ -142,8 +142,8 @@ function geminiEvent(raw: Raw, hook: string): Translated {
 }
 
 /**
- * Normalizes a coding-agent hook payload (as forwarded by scripts/byte-hook.mjs,
- * tagged with `agent`) into a PetEvent. Returns null for anything Byte does not track.
+ * Normalizes a coding-agent hook payload (as forwarded by scripts/pico-hook.mjs,
+ * tagged with `agent`) into a PetEvent. Returns null for anything Pico does not track.
  */
 export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null {
   const raw = obj(input);

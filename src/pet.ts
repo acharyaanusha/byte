@@ -1,9 +1,9 @@
-// Frame-based pet animation. A small state machine picks what Byte is doing
+// Frame-based pet animation. A small state machine picks what Pico is doing
 // (standing, looking around, sitting, walking, turning, waving for you) and
 // which pixel-art frame to show. Walking is a 4-frame cycle (contact, passing,
 // contact, passing) while the body moves continuously at a speed matched to the
 // stride, the way sprite games do it; moving in jumps on some frames reads as floating. In the
-// browser Byte walks inside the habitat; in the overlay the host (Electron)
+// browser Pico walks inside the habitat; in the overlay the host (Electron)
 // moves the window a short way around the spot where you put it.
 import { COLORS } from '../shared/types.js';
 import type { Behavior, ColorName, Species, Stage } from '../shared/types.js';
@@ -13,7 +13,7 @@ type Activity = 'stand' | 'look' | 'sit' | 'walk' | 'turn' | 'greet';
 
 declare global {
   interface Window {
-    byteHost?: {
+    picoHost?: {
       moveBy(dx: number): Promise<{ hitEdge: boolean }>;
       onCommand?(cb: (cmd: string) => void): void;
       setInteractive?(on: boolean): void;
@@ -254,7 +254,7 @@ export class PetAnimator {
 
   /** Moves the body a few pixels. Turns around at the edges. */
   private async advance(px: number, now: number) {
-    const host = window.byteHost;
+    const host = window.picoHost;
     if (host) {
       this.moving = true;
       try {
@@ -275,7 +275,7 @@ export class PetAnimator {
     const pose = this.pose(now);
     const src = this.src(this.stage, pose);
     if (this.img.src !== src && !this.img.src.endsWith(src)) this.img.src = src;
-    // Every frame is drawn facing left; mirror when Byte faces right.
+    // Every frame is drawn facing left; mirror when Pico faces right.
     this.flip.style.transform = this.facing === 1 ? 'scaleX(-1)' : '';
     this.root.dataset.pose = pose;
     return pose;

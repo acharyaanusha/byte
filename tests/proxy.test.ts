@@ -41,7 +41,7 @@ describe('shared Jev proxy', () => {
     expect((await handleJudge(req({ state: 's' }), { apiKey: 'k', fetchImpl, allow: () => true })).status).toBe(502);
   });
 
-  it('Byte uses the proxy when it has no personal key, and a personal key bypasses it', async () => {
+  it('Pico uses the proxy when it has no personal key, and a personal key bypasses it', async () => {
     const calls: string[] = [];
     const fetchImpl = (async (url: string) => {
       calls.push(url);

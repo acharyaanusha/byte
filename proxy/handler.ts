@@ -1,7 +1,7 @@
 /**
- * Byte's shared Jev proxy (POST /api/judge on Vercel), so people can use Byte
+ * Pico's shared Jev proxy (POST /api/judge on Vercel), so people can use Pico
  * without their own TypeSafe key. It holds the key server-side and only ever asks
- * Byte's three fixed questions (buildQuestions) about the bounded summary Byte
+ * Pico's three fixed questions (buildQuestions) about the bounded summary Pico
  * sends, so it can't be used as a general-purpose Jev endpoint. Nothing is stored.
  */
 import { buildQuestions, JEV_MODEL, JEV_URL, parseJudgment } from '../server/jev.js';
@@ -9,7 +9,7 @@ import { createRateLimiter } from './rate-limit.js';
 
 export const MAX_STATE = 8000;
 const TIMEOUT_MS = 8000;
-// Byte's own scheduler asks at most once per 10 s, so a real user never gets near this.
+// Pico's own scheduler asks at most once per 10 s, so a real user never gets near this.
 const defaultAllow = createRateLimiter({ limit: 12, windowMs: 60_000 });
 
 export interface JudgeDeps {

@@ -3,13 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createByte } from '../server/index.js';
+import { createPico } from '../server/index.js';
 import { JudgeScheduler } from '../server/scheduler.js';
 import { mergeHooks } from '../scripts/install-hooks.mjs';
 import { parseJudgment } from '../server/jev.js';
 import type { PetJudgment } from '../shared/types.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'byte-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pico-'));
 let ts = 1000;
 const hook = (name: string, extra: Record<string, unknown> = {}) =>
   ({ session_id: 'S', prompt_id: 'P1', hook_event_name: name, hook_ts: ts++, ...extra });
@@ -29,8 +29,8 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let open: { close(): Promise<void> }[] = [];
 afterEach(async () => { await Promise.all(open.map((b) => b.close())); open = []; });
 
-function byte(judgeImpl: () => Promise<PetJudgment>, statePath = path.join(tmp(), 'pet.json')) {
-  const b = createByte({ statePath, apiKey: 'test', judgeImpl, schedule: fast, log: () => {} });
+function pico(judgeImpl: () => Promise<PetJudgment>, statePath = path.join(tmp(), 'pet.json')) {
+  const b = createPico({ statePath, apiKey: 'test', judgeImpl, schedule: fast, log: () => {} });
   open.push(b);
   return b;
 }
@@ -38,7 +38,7 @@ function byte(judgeImpl: () => Promise<PetJudgment>, statePath = path.join(tmp()
 describe('server + Jev', () => {
   it('failure → edit → matching pass with a positive Jev judgment awards 20 and persists', async () => {
     const statePath = path.join(tmp(), 'pet.json');
-    const b = byte(async () => ({ activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.93, needsAttention: 0.02 }), statePath);
+    const b = pico(async () => ({ activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.93, needsAttention: 0.02 }), statePath);
     for (const e of recoverySession) b.ingest(e);
     b.ingest(bash('b2', true, '# pass 2\n# fail 0')); // duplicate delivery
     await wait(60);
@@ -48,7 +48,7 @@ describe('server + Jev', () => {
   });
 
   it('timeout or malformed answer grants no XP and marks degraded', async () => {
-    const b = byte(async () => { throw new Error('timeout'); });
+    const b = pico(async () => { throw new Error('timeout'); });
     for (const e of recoverySession) b.ingest(e);
     await wait(60);
     expect(b.getState().xp).toBe(0);
@@ -58,7 +58,7 @@ describe('server + Jev', () => {
 
   it('a reply arriving after a new prompt does not award the new turn', async () => {
     let release!: (j: PetJudgment) => void;
-    const b = byte(() => new Promise((r) => { release = r; }));
+    const b = pico(() => new Promise((r) => { release = r; }));
     for (const e of recoverySession) b.ingest(e);
     await wait(30);
     b.ingest(hook('UserPromptSubmit', { prompt_id: 'P2', prompt: 'next' }));
@@ -71,7 +71,7 @@ describe('server + Jev', () => {
 describe('superseded same-turn judgments (server)', () => {
   it('a reply computed before newer evidence is ignored, then the re-evaluation awards exactly once', async () => {
     const replies: ((j: PetJudgment) => void)[] = [];
-    const b = byte(() => new Promise((r) => { replies.push(r); }));
+    const b = pico(() => new Promise((r) => { replies.push(r); }));
     b.ingest(recoverySession[0]);
     b.ingest(recoverySession[1]); // failure → Jev run #1 starts on this snapshot
     await wait(30);
@@ -93,7 +93,7 @@ describe('superseded same-turn judgments (server)', () => {
 describe('appearance endpoint', () => {
   it('saves a valid choice with the pet and rejects unknown ones', async () => {
     const statePath = path.join(tmp(), 'pet.json');
-    const b = byte(async () => { throw new Error('unused'); }, statePath);
+    const b = pico(async () => { throw new Error('unused'); }, statePath);
     await new Promise<void>((r) => b.server.listen(0, '127.0.0.1', r));
     const port = (b.server.address() as { port: number }).port;
     const post = (body: unknown) => fetch(`http://127.0.0.1:${port}/api/appearance`, { method: 'POST', body: JSON.stringify(body) });
@@ -129,15 +129,15 @@ describe('scheduler', () => {
 
 describe('hook transport', () => {
   it('exits 0 with no stdout when the server is offline', () => {
-    const r = spawnSync('node', ['scripts/byte-hook.mjs'], {
+    const r = spawnSync('node', ['scripts/pico-hook.mjs'], {
       input: JSON.stringify(recoverySession[0]),
-      env: { ...process.env, BYTE_URL: 'http://127.0.0.1:9/events' },
+      env: { ...process.env, PICO_URL: 'http://127.0.0.1:9/events' },
     });
     expect(r.status).toBe(0);
     expect(r.stdout.toString()).toBe('');
   });
   it('exits 0 on garbage input', () => {
-    const r = spawnSync('node', ['scripts/byte-hook.mjs'], { input: 'not json' });
+    const r = spawnSync('node', ['scripts/pico-hook.mjs'], { input: 'not json' });
     expect(r.status).toBe(0);
     expect(r.stdout.toString()).toBe('');
   });
@@ -149,7 +149,7 @@ describe('installer', () => {
       permissions: { allow: ['Bash(ls)'] },
       hooks: { PostToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './mine.sh' }] }] },
     };
-    const hookPath = '/x/byte/scripts/byte-hook.mjs';
+    const hookPath = '/x/pico/scripts/pico-hook.mjs';
     const once = mergeHooks(existing, { hookPath });
     const twice = mergeHooks(once, { hookPath });
     expect(twice).toEqual(once);

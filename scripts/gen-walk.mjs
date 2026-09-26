@@ -9,7 +9,7 @@ import sharp from 'sharp';
 const [stage, ...flags] = process.argv.slice(2);
 const flag = flags.includes('--slice-only') ? '--slice-only' : undefined;
 const flip = flags.includes('--flip');
-const RAW = path.resolve('.byte/frames-raw');
+const RAW = path.resolve('.pico/frames-raw');
 const PROMPT = 'Using this exact character (same design, colors, horns, 16-bit pixel art style and outline), draw a 4-frame WALK CYCLE sprite sheet: four frames side by side in ONE horizontal row, evenly spaced, with wide empty gaps between frames, every frame in strict side profile facing LEFT, all the same size and on the same ground line. Frame 1: contact, the LEFT/front leg stepping far forward and the back leg stretched behind. Frame 2: passing, legs together under the body, body slightly higher. Frame 3: contact, the OPPOSITE leg forward (back leg now in front) and the other stretched behind. Frame 4: passing again, legs together. The legs must clearly alternate between frame 1 and frame 3. Flat solid pure magenta (#FF00FF) background everywhere, no text, no numbers, no grid lines, no shadows.';
 
 async function generate(ref) {
