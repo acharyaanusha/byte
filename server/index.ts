@@ -24,7 +24,8 @@ export function createByte(opts: ByteOptions) {
   const log = opts.log ?? ((m: string) => console.log(`[byte] ${m}`));
   const store = new Store(opts.statePath);
   let state: PetState = loadState(opts.statePath) ?? initialState();
-  if (!opts.apiKey) state = markDegraded(state);
+  // Connection is a property of this run, not of the saved pet.
+  state = opts.apiKey ? { ...state, connection: 'waiting' } : markDegraded(state);
   const set = (next: PetState) => { state = next; store.save(state); };
 
   const scheduler = new JudgeScheduler(async () => {
