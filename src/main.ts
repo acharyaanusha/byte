@@ -137,6 +137,8 @@ function render() {
     el.pet.dataset.behavior = shown;
     animator.setBehavior(shown);
   }
+  const j = s.lastJudgment;
+  animator.setAttention(!!j && j.needsAttention >= 0.8 && now - j.at < 30_000 && now >= s.celebrateUntil);
 
   // Caption
   el.caption.textContent = now < petCaptionUntil ? CAPTIONS.pet
@@ -200,7 +202,11 @@ function toggleReplay() {
   render();
 }
 el.replay.addEventListener('click', toggleReplay);
-window.byteHost?.onCommand?.((cmd) => { if (cmd === 'replay') toggleReplay(); });
+window.byteHost?.onCommand?.((cmd) => {
+  if (cmd === 'replay') toggleReplay();
+  if (cmd === 'fall-start') animator.falling = true;
+  if (cmd === 'fall-end') animator.falling = false;
+});
 
 function exitReplay() {
   stopReplay?.();

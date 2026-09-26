@@ -1,15 +1,18 @@
-// Frame-based pet animation: picks pixel-art frames per behavior and walks Byte
-// around. In the browser it walks inside the habitat; in the overlay it asks the
-// host (Electron) to move the whole window across the screen.
+// Frame-based pet animation. A small state machine picks what Byte is doing
+// (standing, looking around, sitting, walking, turning, running to you) and
+// which pixel-art frame to show. Walking is a 4-frame cycle that only advances
+// on the contact frames, so steps look planted instead of gliding. In the
+// browser Byte walks inside the habitat; in the overlay the host (Electron)
+// moves the whole window along the floor of the screen.
 import type { Behavior, Stage } from '../shared/types.js';
 
-type Pose = 'idle' | 'blink' | 'walk1' | 'walk2' | 'jump' | 'puzzled' | 'sleep' | 'wave';
-type Mode = Behavior | 'wave';
+type Pose = 'idle' | 'blink' | 'walk1' | 'walk2' | 'walkpass' | 'jump' | 'puzzled' | 'sleep' | 'wave' | 'sit';
+type Activity = 'stand' | 'look' | 'sit' | 'walk' | 'turn' | 'run' | 'greet';
 
 declare global {
   interface Window {
     byteHost?: {
-      moveBy(dx: number): Promise<{ hitEdge: boolean }>;
+      moveBy(dx: number): Promise<{ hitEdge: boolean; toCenter: number }>;
       onCommand?(cb: (cmd: string) => void): void;
       setInteractive?(on: boolean): void;
       dragStart?(): void;
@@ -19,96 +22,157 @@ declare global {
   }
 }
 
-const POSES: Pose[] = ['idle', 'blink', 'walk1', 'walk2', 'jump', 'puzzled', 'sleep', 'wave'];
-const STEP_PX = 6;          // distance per walk tick
-const WALK_TICK_MS = 180;   // frame time per stride
-const HABITAT_RANGE = 80;   // max px from center inside the browser habitat
+const POSES: Pose[] = ['idle', 'blink', 'walk1', 'walk2', 'walkpass', 'jump', 'puzzled', 'sleep', 'wave', 'sit'];
+/** Contact, passing, contact, passing. Byte only moves on contact frames. */
+const WALK: Pose[] = ['walk1', 'walkpass', 'walk2', 'walkpass'];
+const TICK_MS = 60;
+const WALK_FRAME_MS = 150, RUN_FRAME_MS = 90;
+const STEP_PX = 12, RUN_STEP_PX = 20;
+const HABITAT_RANGE = 80;
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 export class PetAnimator {
   private stage: Stage = 'hatchling';
-  private mode: Mode = 'idle';
-  private tick = 0;
-  private dir: -1 | 1 = -1;  // walk frames face left; -1 = moving left
-  private x = 0;             // habitat offset when not in the overlay
-  private strollUntil = 0;
-  private nextStroll = Date.now() + 5000;
+  private mode: Behavior = 'idle';
+  private activity: Activity = 'stand';
+  private activityUntil = 0;
+  private facing: -1 | 1 = -1;    // -1 = facing/heading left (how the frames are drawn)
+  private walkIndex = 0;
+  private nextFrameAt = 0;
+  private x = 0;                  // habitat offset when not in the overlay
   private waveUntil = 0;
+  private blinkUntil = 0;
+  private nextBlink = Date.now() + 2500;
   private moving = false;
-  private paused = false;
-  /** Set while the user drags the overlay: Byte stops walking. */
+  private hovered = false;
+  private attention = false;
+  /** Set while the user drags the overlay. */
   held = false;
+  /** Set while the overlay falls back to the floor. */
+  falling = false;
 
   constructor(private root: HTMLElement, private img: HTMLImageElement, private flip: HTMLElement) {
     for (const s of ['hatchling', 'sprout', 'companion']) for (const p of POSES) new Image().src = this.src(s as Stage, p);
-    setInterval(() => this.step(), WALK_TICK_MS);
-    root.addEventListener('mouseenter', () => { this.paused = true; });
-    root.addEventListener('mouseleave', () => { this.paused = false; });
+    root.addEventListener('mouseenter', () => { this.hovered = true; });
+    root.addEventListener('mouseleave', () => { this.hovered = false; });
+    setInterval(() => void this.step(), TICK_MS);
   }
 
   private src(stage: Stage, pose: Pose) { return `/pet/frames/${stage}-${pose}.png`; }
 
   setStage(stage: Stage) { this.stage = stage; this.render(); }
+
   setBehavior(b: Behavior) {
     if (b === this.mode) return;
     this.mode = b;
-    if (b === 'idle') this.nextStroll = Date.now() + 3000;
-    this.render();
+    this.activityUntil = 0; // re-plan right away
   }
-  wave() { this.waveUntil = Date.now() + 1400; this.render(); }
+
+  /** Jev thinks the user is needed: run toward the middle of the screen and wave. */
+  setAttention(on: boolean) {
+    if (on === this.attention) return;
+    this.attention = on;
+    this.activityUntil = 0;
+  }
+
+  wave() { this.waveUntil = Date.now() + 1400; }
+
+  /** Picks the next thing to do, based on the pet's current mood. */
+  private plan(now: number) {
+    const pick = (a: Activity, min: number, max: number) => { this.activity = a; this.activityUntil = now + rand(min, max); };
+    if (this.attention && this.mode !== 'sleeping' && this.mode !== 'celebrating') {
+      if (this.activity !== 'run' && this.activity !== 'greet') return pick('run', 4000, 4000);
+      return pick('greet', 2500, 3500);
+    }
+    if (this.mode === 'focused') {
+      const r = Math.random();
+      if (r < 0.6) return pick('walk', 1800, 3500);
+      if (r < 0.85) return pick('look', 1200, 2000);
+      return pick('stand', 800, 1500);
+    }
+    if (this.mode === 'idle') {
+      const r = Math.random();
+      if (r < 0.3) return pick('walk', 1200, 2500);
+      if (r < 0.5) return pick('look', 1500, 2500);
+      if (r < 0.75) return pick('sit', 4000, 8000);
+      return pick('stand', 2000, 4000);
+    }
+    pick('stand', 1000, 1000); // puzzled / celebrating / sleeping use fixed poses
+  }
+
+  /** Pause briefly facing the old way, then flip: reads as turning around, not bouncing. */
+  private turn(now: number) {
+    this.activity = 'turn';
+    this.activityUntil = now + 350;
+  }
 
   private pose(now: number): Pose {
+    if (this.falling) return 'jump';
     if (now < this.waveUntil) return 'wave';
-    switch (this.mode) {
-      case 'puzzled': return 'puzzled';
-      case 'sleeping': return 'sleep';
-      case 'celebrating': return this.tick % 4 < 2 ? 'jump' : 'idle';
-      case 'focused':
-        return this.walking(now) ? (this.tick % 2 ? 'walk1' : 'walk2') : 'idle';
-      default:
-        if (this.walking(now)) return this.tick % 2 ? 'walk1' : 'walk2';
-        return this.tick % 22 === 0 ? 'blink' : 'idle';
+    if (this.mode === 'sleeping') return 'sleep';
+    if (this.mode === 'puzzled' && !this.attention) return 'puzzled';
+    if (this.mode === 'celebrating') return Math.floor(now / 300) % 2 ? 'jump' : 'idle';
+    switch (this.activity) {
+      case 'walk': case 'run': return WALK[this.walkIndex];
+      case 'sit': return 'sit';
+      case 'greet': return 'wave';
+      default: return now < this.blinkUntil ? 'blink' : 'idle';
     }
-  }
-
-  /** Focused: walk most of the time with short pauses. Idle: an occasional short stroll. */
-  private walking(now: number): boolean {
-    if (this.paused || this.held || now < this.waveUntil) return false;
-    if (this.mode === 'focused') return this.tick % 30 < 22;
-    if (this.mode !== 'idle') return false;
-    if (now >= this.nextStroll && now > this.strollUntil) {
-      this.strollUntil = now + 1400 + Math.random() * 1400;
-      this.nextStroll = this.strollUntil + 6000 + Math.random() * 6000;
-      if (Math.random() < 0.5) this.dir = this.dir === 1 ? -1 : 1;
-    }
-    return now < this.strollUntil;
   }
 
   private async step() {
-    this.tick++;
     const now = Date.now();
-    const pose = this.render(now);
-    if ((pose !== 'walk1' && pose !== 'walk2') || this.moving) return;
-    const dx = this.dir * STEP_PX;
-    if (window.byteHost) {
+    if (now >= this.nextBlink) { this.blinkUntil = now + 140; this.nextBlink = now + rand(2500, 5000); }
+    if (now >= this.activityUntil) {
+      if (this.activity === 'turn') this.facing = this.facing === 1 ? -1 : 1;
+      this.plan(now);
+      if (this.activity === 'walk' && Math.random() < 0.35) this.turn(now); // sometimes set off the other way
+    }
+    // Looking around: glance the other way now and then.
+    if (this.activity === 'look' && Math.random() < 0.03) this.facing = this.facing === 1 ? -1 : 1;
+
+    const walking = (this.activity === 'walk' || this.activity === 'run')
+      && !this.held && !this.falling && !this.hovered && now >= this.waveUntil
+      && this.mode !== 'sleeping' && this.mode !== 'celebrating' && (this.mode !== 'puzzled' || this.attention);
+    if (walking && now >= this.nextFrameAt && !this.moving) {
+      const run = this.activity === 'run';
+      this.nextFrameAt = now + (run ? RUN_FRAME_MS : WALK_FRAME_MS);
+      this.walkIndex = (this.walkIndex + 1) % WALK.length;
+      if (WALK[this.walkIndex] !== 'walkpass') await this.advance(run ? RUN_STEP_PX : STEP_PX, now);
+    }
+    this.render(now);
+  }
+
+  /** Moves one step on a contact frame. Turns around at the edges. */
+  private async advance(px: number, now: number) {
+    const host = window.byteHost;
+    if (host) {
       this.moving = true;
       try {
-        const { hitEdge } = await window.byteHost.moveBy(dx);
-        if (hitEdge) this.dir = this.dir === 1 ? -1 : 1;
+        const { hitEdge, toCenter } = await host.moveBy(this.facing * px);
+        if (this.activity === 'run') {
+          // Head for the middle of the screen; greet on arrival.
+          if (Math.abs(toCenter) <= px) { this.activity = 'greet'; this.activityUntil = now + 3000; }
+          else this.facing = toCenter > 0 ? 1 : -1;
+        } else if (hitEdge) this.turn(now);
       } finally { this.moving = false; }
-    } else {
-      this.x += dx;
-      if (Math.abs(this.x) >= HABITAT_RANGE) { this.x = Math.sign(this.x) * HABITAT_RANGE; this.dir = this.dir === 1 ? -1 : 1; }
-      this.root.style.setProperty('--walk-x', `${this.x}px`);
+      return;
     }
+    this.x += this.facing * px;
+    if (Math.abs(this.x) >= HABITAT_RANGE) {
+      this.x = Math.sign(this.x) * HABITAT_RANGE;
+      if (this.activity === 'run') { this.activity = 'greet'; this.activityUntil = now + 3000; }
+      else this.turn(now);
+    }
+    this.root.style.setProperty('--walk-x', `${this.x}px`);
   }
 
   private render(now = Date.now()): Pose {
     const pose = this.pose(now);
     const src = this.src(this.stage, pose);
     if (!this.img.src.endsWith(src)) this.img.src = src;
-    // Walk frames face left; mirror them when heading right.
-    const facingRight = (pose === 'walk1' || pose === 'walk2') && this.dir === 1;
-    this.flip.style.transform = facingRight ? 'scaleX(-1)' : '';
+    // Every frame is drawn facing left; mirror when Byte faces right.
+    this.flip.style.transform = this.facing === 1 ? 'scaleX(-1)' : '';
     this.root.dataset.pose = pose;
     return pose;
   }

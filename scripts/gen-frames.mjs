@@ -28,6 +28,8 @@ const POSES = {
   puzzled: 'Edit this exact character: confused and puzzled, head tilted to one side, one paw scratching its head, small frown, one eyebrow raised. ' + KEEP,
   sleep: 'Edit this exact character: fast asleep, curled up lying down on its belly with tail wrapped around, eyes closed, peaceful. IMPORTANT: the entire background must stay flat pure magenta #FF00FF, no bed, no blanket, no colored box. ' + KEEP,
   wave: 'Edit this exact character: happily waving hello with one paw raised high, big smile. ' + KEEP,
+  walkpass: 'This is a walk-cycle contact frame. Draw the PASSING frame of the same walk: same strict side profile facing LEFT, the body slightly higher, one leg straight under the body carrying the weight and the other leg bent and lifted, passing it mid-swing. Arms relaxed at the sides. ' + KEEP,
+  sit: 'Edit this exact character: sitting down on its bottom on the ground, legs stretched out in front, relaxed and content, looking forward with a small smile. ' + KEEP,
 };
 
 async function generate(prompt, refPng) {
@@ -117,7 +119,7 @@ if (flag === '--only') {
   const wanted = process.argv[4].split(',');
   await Promise.all(wanted.map(async (id) => {
     const [stage, pose] = id.split('-');
-    const base = await fs.readFile(path.join(RAW, `${stage}-idle.png`));
+    const base = await fs.readFile(path.join(RAW, `${stage}-${pose === 'walkpass' ? 'walk1' : 'idle'}.png`));
     const out = await generate(POSES[pose], base);
     await fs.writeFile(path.join(RAW, `${stage}-${pose}.png`), out);
     if (pose === 'walk1') await fs.writeFile(path.join(RAW, `${stage}-walk2.png`), await generate(POSES.walk2, out));

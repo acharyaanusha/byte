@@ -33,7 +33,7 @@ Claude Code ──hooks──▶ scripts/claude-hook.mjs ──POST /events (300
 browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic writes)
 ```
 
-- **Behaviors (frame-animated):** idle (standing, blinking, the odd stroll), focused (walks back and forth while your agent works; in the overlay the whole window walks along your screen), puzzled (scratching its head after a failed command), celebrating (jumping, 4 s), sleeping (curled up after 90 s with no activity). Clicking Byte makes it wave. Growing to a new stage adds a flash and a scale pop. Byte holds each ordinary behavior for at least 3 s so it doesn't flicker.
+- **Behaviors (frame-animated):** Byte walks with a 4-frame cycle (contact, passing, contact, passing). It only moves forward on the contact frames, bobbing up on the passing ones, so its steps look planted. When idle it mixes standing, blinking, looking around, sitting and short strolls. It turns around before changing direction. While your agent works (focused) it paces more. It scratches its head after a failed check, jumps when it earns XP, and curls up after 90 s with no activity. When Jev thinks you're needed, it runs to the middle of the screen and waves. Clicking Byte makes it wave. In the overlay Byte stands on the bottom of the screen, just above the Dock. Drop it mid-air and it falls back down with a small bounce. Growing to a new stage adds a flash and a scale pop.
 - **Turns:** each event's Claude Code `prompt_id` is its turn ID. A Jev reply for an older turn is ignored, so it can't award XP to a newer one.
 - **Superseded replies:** each turn's evidence has a version. If new evidence lands while Jev is thinking, that reply is dropped and the current evidence is judged next.
 - **Out-of-order hooks:** async hooks can arrive out of order, so the hook stamps each event when Claude Code runs it. The server re-derives the turn's evidence in that order. A tool event that beats its prompt still opens the turn.
@@ -104,7 +104,7 @@ node scripts/gen-frames.mjs <reference.png>   # regenerate art via OpenRouter (n
 
 `fixtures/claude-code-2.1.283-hooks.json` holds real hook payloads captured from Claude Code 2.1.283 (with paths and file contents stripped). The tests run the normalizer against them.
 
-The art is 24 pixel-art frames (3 stages × idle, blink, 2-step walk, jump, puzzled, sleep, wave), generated with `google/gemini-3-pro-image` through OpenRouter. The style was picked from four candidates. Each stage is an edit of the one before, and each pose is an edit of its stage's base, which keeps the character consistent. The model painted on flat magenta, which `sharp` keys out to transparency. Every frame shares one scale per stage and one ground line, so switching frames never jumps (`scripts/gen-frames.mjs`).
+The art is 30 pixel-art frames (3 stages × idle, blink, 3 walk-cycle frames, jump, puzzled, sleep, wave, sit), generated with `google/gemini-3-pro-image` through OpenRouter. The style was picked from four candidates. Each stage is an edit of the one before, and each pose is an edit of its stage's base, which keeps the character consistent. The model painted on flat magenta, which `sharp` keys out to transparency. Every frame shares one scale per stage and one ground line, so switching frames never jumps (`scripts/gen-frames.mjs`).
 
 ## Known limits
 
