@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Byte: your coding companion grows with every little breakthrough." />
-    <link rel="icon" href="/pet/hatchling.png" />
+    <link rel="icon" href="/pet/frames/hatchling-idle.png" />
     <title>Byte</title>
   </head>
   <body>
@@ -27,7 +27,7 @@
         <div class="hill"></div>
         <button class="pet" id="pet" data-behavior="idle" aria-label="Pet Byte">
           <span class="shadow"></span>
-          <img id="sprite" src="/pet/hatchling.png" alt="Byte the dragon" width="184" height="184" draggable="false" />
+          <span class="flip" id="flip"><img id="sprite" src="/pet/frames/hatchling-idle.png" alt="Byte the dragon" width="276" height="184" draggable="false" /></span>
           <span class="zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
           <span class="puzzle" aria-hidden="true">?</span>
         </button>
@@ -38,6 +38,7 @@
       <p class="caption" id="caption" aria-live="polite">Hi! I’m Byte.</p>
 
       <section class="xp">
+        <span class="stage mini" id="stage-mini">Hatchling</span>
         <div class="xp-row"><strong id="xp">0 XP</strong><span id="xp-next">20 to sprout</span></div>
         <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar"><span id="bar-fill"></span></div>
       </section>

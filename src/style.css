@@ -63,36 +63,41 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .hill { position: absolute; left: -10%; right: -10%; bottom: 0; height: 44%; background: #f5eed9; border-radius: 50% 50% 0 0 / 30% 30% 0 0; }
 .pet {
   position: absolute; left: 50%; bottom: 10px;
-  width: 184px; height: 184px; margin-left: -92px;
+  width: 276px; height: 184px; margin-left: -138px;
   padding: 0; border: 0; background: none; cursor: pointer;
   transform-origin: 50% 85%;
   -webkit-tap-highlight-color: transparent;
 }
 .pet:focus-visible { outline: 3px solid var(--mint-deep); outline-offset: 4px; border-radius: 24px; }
-.pet img { position: relative; width: 184px; height: 184px; display: block; user-select: none; transform-origin: 50% 85%; transition: transform .35s ease; }
+.pet img { position: relative; width: 276px; height: 184px; display: block; user-select: none; transform-origin: 50% 85%; transition: transform .35s ease; }
 .shadow { position: absolute; left: 50%; bottom: 20px; width: 96px; height: 14px; margin-left: -48px; border-radius: 50%; background: #2c3a3618; }
 .zzz, .puzzle { position: absolute; opacity: 0; transition: opacity .4s; pointer-events: none; font-weight: 800; color: var(--ink-2); }
 .zzz { top: 20px; right: 18px; font-size: 16px; }
 .zzz i { font-style: normal; display: inline-block; }
 .puzzle { top: 18px; right: 34px; font-size: 26px; color: var(--mint-deep); }
 
-/* Behaviors */
+/* Behaviors: the frames carry the pose; CSS adds weight and bounce. */
+.pet { transform: translateX(var(--walk-x, 0px)); transition: transform .18s linear; }
+.flip { display: block; transform-origin: 50% 50%; }
+.pet img { image-rendering: pixelated; }
 .pet[data-behavior='idle'] img { animation: breathe 3.2s ease-in-out infinite; }
-.pet[data-behavior='focused'] img { animation: bob 1.1s ease-in-out infinite; }
-.pet[data-behavior='puzzled'] img { transform: rotate(-9deg); animation: ponder 2.4s ease-in-out infinite; }
+.pet[data-pose='walk1'] img, .pet[data-pose='walk2'] img { animation: none; }
+.pet[data-pose='walk2'] img { transform: translateY(-3px); }
+.pet[data-behavior='puzzled'] img { animation: ponder 2.4s ease-in-out infinite; }
 .pet[data-behavior='puzzled'] .puzzle { opacity: 1; animation: pop 2.4s ease-in-out infinite; }
-.pet[data-behavior='celebrating'] img { animation: hop .6s cubic-bezier(.3,.7,.4,1) infinite; }
-.pet[data-behavior='sleeping'] img { animation: breathe 5s ease-in-out infinite; filter: saturate(.75) brightness(.97); }
+.pet[data-behavior='celebrating'][data-pose='jump'] img { transform: translateY(-22px); }
+.pet[data-behavior='sleeping'] img { animation: breathe 5s ease-in-out infinite; filter: saturate(.8); }
 .pet[data-behavior='sleeping'] .zzz { opacity: 1; }
 .pet[data-behavior='sleeping'] .zzz i { animation: float 3s ease-in-out infinite; }
 .pet[data-behavior='sleeping'] .zzz i:nth-child(2) { animation-delay: .6s; font-size: 13px; }
 .pet[data-behavior='sleeping'] .zzz i:nth-child(3) { animation-delay: 1.2s; font-size: 10px; }
 .pet.grow img { animation: grow 1.1s cubic-bezier(.2,.9,.3,1.3); }
 .pet.grow .shadow { transition: none; }
+.stage.mini { display: none; }
 
 @keyframes breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.02,.975); } }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@keyframes ponder { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(-5deg); } }
+@keyframes ponder { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(2deg); } }
 @keyframes hop { 0%,100% { transform: translateY(0) scale(1.03,.97); } 45% { transform: translateY(-26px) scale(.97,1.04); } }
 @keyframes float { 0% { transform: translate(0,0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(8px,-18px); opacity: 0; } }
 @keyframes pop { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.1); } }
@@ -140,7 +145,30 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .pet[data-behavior='celebrating'] img { transform: translateY(-10px); }
-  .pet[data-behavior='focused'] img { transform: translateY(-3px); }
   .pet[data-behavior='sleeping'] .zzz i { opacity: .8; }
 }
+
+/* Overlay mode (?overlay): just Byte, a speech bubble and a thin XP bar on a transparent window. */
+html.overlay, html.overlay body { background: transparent; }
+html.overlay .app { background: transparent; min-height: 0; max-width: none; height: 100vh; padding: 0 8px 6px; gap: 2px; justify-content: flex-end; overflow: hidden; }
+html.overlay .top, html.overlay .milestones, html.overlay .details, html.overlay .actions, html.overlay #other-banner { display: none !important; }
+html.overlay .banner.demo { font-size: 10px; padding: 3px 6px; order: -2; }
+html.overlay .caption {
+  order: -1; position: relative; align-self: center; min-height: 0; max-width: 230px;
+  font-size: 12.5px; padding: 6px 10px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
+  -webkit-app-region: drag; cursor: grab; box-shadow: 0 2px 0 #2c3a36;
+}
+html.overlay .caption::after {
+  content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px;
+  background: #fffdf7; border-right: 1.5px solid #2c3a36; border-bottom: 1.5px solid #2c3a36; transform: rotate(45deg);
+}
+html.overlay .habitat { height: 150px; flex: none; background: none; border: 0; overflow: visible; }
+html.overlay .sun, html.overlay .hill, html.overlay .flash { display: none; }
+html.overlay .pet { width: 225px; height: 150px; margin-left: -112px; bottom: 0; }
+html.overlay .pet img { width: 225px; height: 150px; }
+html.overlay .shadow { bottom: 6px; width: 70px; margin-left: -35px; }
+html.overlay .xp { display: flex; align-items: center; gap: 6px; -webkit-app-region: drag; background: #fffdf7e6; border: 1.5px solid #2c3a36; border-radius: 99px; padding: 3px 8px; }
+html.overlay .xp-row { margin: 0; font-size: 11px; order: 2; }
+html.overlay .xp-row span { display: none; }
+html.overlay .bar { flex: 1; height: 7px; order: 1; }
+html.overlay .stage.mini { display: inline; font-size: 9.5px; padding: 1px 6px; order: 0; }

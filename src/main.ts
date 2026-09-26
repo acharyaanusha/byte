@@ -3,6 +3,10 @@ import { CAPTIONS, publicState } from '../server/state.js';
 import type { PublicState } from '../server/state.js';
 import type { Behavior, MilestoneRecord, PetState, Stage } from '../shared/types.js';
 import { startReplay } from './replay.js';
+import { PetAnimator } from './pet.js';
+
+const overlay = new URLSearchParams(location.search).has('overlay');
+if (overlay) document.documentElement.classList.add('overlay');
 
 const SLEEP_AFTER_MS = 90_000;
 const HOLD_MS = 3000;
@@ -19,7 +23,7 @@ const el = {
   caption: $('caption'), xp: $('xp'), xpNext: $('xp-next'), bar: $('bar'), barFill: $('bar-fill'),
   milestones: $('milestones'), details: $('details-body'), hearts: $('hearts'), flash: $('flash'),
   replay: $<HTMLButtonElement>('replay'), disconnect: $<HTMLButtonElement>('disconnect'),
-  demoBanner: $('demo-banner'), otherBanner: $('other-banner'),
+  demoBanner: $('demo-banner'), otherBanner: $('other-banner'), stageMini: $('stage-mini'), flip: $('flip'),
 };
 
 const pageStart = Date.now();
@@ -32,8 +36,7 @@ let lastGrewAt = 0;
 let petCaptionUntil = 0;
 let stopReplay: (() => void) | null = null;
 
-// Preload every stage so growth never flickers.
-for (const s of ['hatchling', 'sprout', 'companion']) new Image().src = `/pet/${s}.png`;
+const animator = new PetAnimator(el.pet, el.sprite, el.flip);
 
 function targetBehavior(s: PublicState, now: number): Behavior {
   if (now < s.celebrateUntil) return 'celebrating';
@@ -114,8 +117,8 @@ function render() {
 
   // Stage + growth flash
   if (shownStage !== s.stage) {
-    el.sprite.src = `/pet/${s.stage}.png`;
-    el.stage.textContent = s.stage[0].toUpperCase() + s.stage.slice(1);
+    animator.setStage(s.stage);
+    el.stage.textContent = el.stageMini.textContent = s.stage[0].toUpperCase() + s.stage.slice(1);
     if (shownStage && s.grewAt > lastGrewAt) {
       el.pet.classList.remove('grow'); void el.pet.offsetWidth; el.pet.classList.add('grow');
       el.flash.classList.remove('on'); void el.flash.offsetWidth; el.flash.classList.add('on');
@@ -130,6 +133,7 @@ function render() {
     shown = target;
     shownSince = now;
     el.pet.dataset.behavior = shown;
+    animator.setBehavior(shown);
   }
 
   // Caption
@@ -165,6 +169,7 @@ async function poll() {
 
 el.pet.addEventListener('click', () => {
   petCaptionUntil = Date.now() + 1800;
+  animator.wave();
   for (let i = 0; i < 4; i++) {
     const h = document.createElement('span');
     h.className = 'heart';
@@ -178,12 +183,14 @@ el.pet.addEventListener('click', () => {
   render();
 });
 
-el.replay.addEventListener('click', () => {
+function toggleReplay() {
   if (stopReplay) { exitReplay(); return; }
   shownStage = null; lastGrewAt = Date.now();
   stopReplay = startReplay((s: PetState) => { latest = publicState(s, Date.now()); render(); }, exitReplay);
   render();
-});
+}
+el.replay.addEventListener('click', toggleReplay);
+window.byteHost?.onCommand?.((cmd) => { if (cmd === 'replay') toggleReplay(); });
 
 function exitReplay() {
   stopReplay?.();

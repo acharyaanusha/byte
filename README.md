@@ -2,9 +2,9 @@
 
 **Your coding companion grows with every little breakthrough.**
 
-<img src="public/pet/hatchling.png" width="120" alt="Byte, hatchling"> <img src="public/pet/sprout.png" width="120" alt="Byte, sprout"> <img src="public/pet/companion.png" width="120" alt="Byte, companion">
+<img src="public/pet/frames/hatchling-idle.png" width="150" alt="Byte, hatchling"> <img src="public/pet/frames/sprout-walk1.png" width="150" alt="Byte, sprout, walking"> <img src="public/pet/frames/companion-jump.png" width="150" alt="Byte, companion, celebrating">
 
-Byte is a small dragon that lives in a browser window beside your terminal. It watches your
+Byte is a small pixel-art dragon that floats in an always-on-top overlay above your terminal or coding app, or in a browser window beside it. It watches your
 Claude Code session through hooks and grows when you and your agent hit real coding
 milestones, such as fixing a failing test.
 
@@ -33,7 +33,7 @@ Claude Code ──hooks──▶ scripts/claude-hook.mjs ──POST /events (300
 browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic writes)
 ```
 
-- **Behaviors:** idle (breathing), focused (bobbing), puzzled (tilting, after a failed command), celebrating (hopping, 4 s), sleeping (after 90 s with no activity). Growing to a new stage adds a flash and a scale pop. Byte holds each ordinary behavior for at least 3 s so it doesn't flicker.
+- **Behaviors (frame-animated):** idle (standing, blinking, the odd stroll), focused (walks back and forth while your agent works; in the overlay the whole window walks along your screen), puzzled (scratching its head after a failed command), celebrating (jumping, 4 s), sleeping (curled up after 90 s with no activity). Clicking Byte makes it wave. Growing to a new stage adds a flash and a scale pop. Byte holds each ordinary behavior for at least 3 s so it doesn't flicker.
 - **Turns:** each event's Claude Code `prompt_id` is its turn ID. A Jev reply for an older turn is ignored, so it can't award XP to a newer one.
 - **Supported checks:** `npm test`, `npm run test`, `npm run typecheck`. A passing run must also show recognizable output (node:test, vitest or jest summaries; no `error TS` for typecheck). Compound shell commands (`&&`, `|`, `;` …) can change Byte's mood but can't earn XP.
 - **What Jev sees:** the prompt excerpt (≤ 500 chars) and the turn's last 12 events, with command output tails of ≤ 500 chars each and ≤ 8,000 chars in total. File contents, environment and anything that looks like a key are left out. The prompt tells Jev to treat all of it as evidence, not instructions.
@@ -48,7 +48,10 @@ cp .env.example .env          # then set TYPESAFE_API_KEY (server-side only)
 npm run dev                   # server on 127.0.0.1:4317, UI on http://127.0.0.1:5173
 ```
 
-Open http://127.0.0.1:5173 in a narrow window (about 360 × 480) beside your terminal.
+Then either:
+
+- **Overlay (recommended):** `npm run overlay` opens a transparent, frameless, always-on-top Byte that floats above every app, including full-screen terminals, and follows you across Spaces. Drag it by the speech bubble or the XP bar. Right-click it to open the full view, replay the demo, or quit.
+- **Browser:** open http://127.0.0.1:5173 in a narrow window (about 360 × 480) for the full view with milestones and Jev details.
 
 ### Install the hooks in a repo
 
@@ -86,12 +89,12 @@ To reset the pet: stop the server and delete `.byte/pet.json`. To reset the demo
 ```bash
 npm test          # vitest: reducer, awards, scheduler, hook transport, installer
 npm run build     # typecheck + production bundle (contains no API key)
-npm run sprites   # regenerate art via OpenRouter (needs OPENROUTER_API_KEY)
+node scripts/gen-frames.mjs <reference.png>   # regenerate art via OpenRouter (needs OPENROUTER_API_KEY)
 ```
 
 `fixtures/claude-code-2.1.283-hooks.json` holds real hook payloads captured from Claude Code 2.1.283 (with paths and file contents stripped). The tests run the normalizer against them.
 
-The sprites were generated with `google/gemini-3-pro-image` through OpenRouter. The hatchling came first, and each later stage was generated as an edit of the stage before it to keep the character consistent. The model painted on flat magenta, which `sharp` keys out to transparency (`scripts/gen-sprites.mjs`).
+The art is 24 pixel-art frames (3 stages × idle, blink, 2-step walk, jump, puzzled, sleep, wave), generated with `google/gemini-3-pro-image` through OpenRouter. The style was picked from four candidates. Each stage is an edit of the one before, and each pose is an edit of its stage's base, which keeps the character consistent. The model painted on flat magenta, which `sharp` keys out to transparency. Every frame shares one scale per stage and one ground line, so switching frames never jumps (`scripts/gen-frames.mjs`).
 
 ## Known limits
 
