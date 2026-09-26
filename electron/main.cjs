@@ -14,7 +14,7 @@ const path = require('node:path');
 const DEV_UI = process.env.BYTE_UI_URL;
 const PORT = Number(process.env.BYTE_PORT ?? 4317);
 const UI = DEV_UI ?? `http://127.0.0.1:${PORT}/`;
-const W = 196, H = 150;
+const W = 200, H = 166;
 /** Byte wanders at most this far either side of where you last put it. */
 const WANDER = 90;
 let win;
@@ -159,7 +159,7 @@ function create() {
     const send = (cmd) => () => win.webContents.send('byte:command', cmd);
     const petMenu = [['dragon', 'Mint dragon'], ['fire', 'Fire dragon'], ['cat', 'Wizard cat'], ['robot', 'Robot']]
       .map(([id, label]) => ({ label, click: send(`species:${id}`) }));
-    const colorMenu = ['original', 'mint', 'sky', 'lavender', 'rose', 'ember', 'gold']
+    const colorMenu = ['original', 'mint', 'sky', 'lavender', 'rose', 'ember', 'gold', 'black']
       .map((c) => ({ label: c[0].toUpperCase() + c.slice(1), click: send(`color:${c}`) }));
     Menu.buildFromTemplate([
       { label: 'Pet', submenu: petMenu },

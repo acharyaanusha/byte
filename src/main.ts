@@ -249,13 +249,14 @@ const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
 const SWATCH: Record<ColorName, string> = {
   original: 'conic-gradient(#7fd6b0 0 25%, #e8643c 0 50%, #f0a24a 0 75%, #9fb3c8 0)',
   mint: 'hsl(150 55% 55%)', sky: 'hsl(205 70% 60%)', lavender: 'hsl(270 55% 68%)',
-  rose: 'hsl(335 65% 68%)', ember: 'hsl(12 75% 55%)', gold: 'hsl(45 85% 55%)',
+  rose: 'hsl(335 65% 68%)', ember: 'hsl(12 75% 55%)', gold: 'hsl(45 85% 55%)', black: '#26262b',
 };
 
 function thumb(species: Species, color: ColorName, stage: Stage, alt: string): HTMLImageElement {
   const img = new Image(96, 64);
   img.alt = alt;
   img.decoding = 'async';
+  img.src = `/pet/${species}/${stage}-idle.png`; // the drawn art right away; the recolored copy swaps in when ready
   void frameUrl(species, color, stage).then((u) => { img.src = u; });
   return img;
 }

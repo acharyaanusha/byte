@@ -23,7 +23,7 @@ Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn e
 
 ## Make it yours
 
-Pick a **pet type** (mint dragon, fire dragon, wizard cat, robot) and a **color** (original, mint, sky, lavender, rose, ember, gold) in the full view's **Your pet** gallery. It shows every pet in your color and your pet's three growth stages, with the ones you haven't reached yet locked. From the overlay, hover over Byte and click **✎**, or right-click → **Pet** / **Color**. Your choice is saved with your pet. Every type has the same three growth stages and the same animations. Colors recolor only the main body hue, so eyes, bellies and accents stay as drawn (for the robot, the color changes its glow).
+Pick a **pet type** (mint dragon, fire dragon, wizard cat, robot) and a **color** (original, mint, sky, lavender, rose, ember, gold, black) in the full view's **Your pet** gallery. It shows every pet in your color and your pet's three growth stages, with the ones you haven't reached yet locked. From the overlay, hover over Byte and click **✎**, or right-click → **Pet** / **Color**. Your choice is saved with your pet. Every type has the same three growth stages and the same animations. Colors recolor only the main body hue, so eyes, bellies and accents stay as drawn (for the robot, the color changes its glow).
 
 The art for each type was generated in Byte's pixel style by `scripts/gen-species.mjs`.
 
@@ -62,7 +62,7 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Byte-0.3.1-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+1. Download **Byte-0.3.2-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
 2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
 3. Byte finds the coding agents on your Mac (Claude Code, Codex, Gemini CLI) and asks to **connect** to them. It adds small hooks to each agent's settings and keeps a backup. Start a new session and Byte follows it. Codex asks you to trust new hooks the first time; approve Byte's.
 That's it: **no API key needed.** Byte asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Byte → **Use my own Jev API key…** to call Jev directly instead.

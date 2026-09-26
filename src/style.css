@@ -206,10 +206,13 @@ html.overlay .pet { width: 108px; height: 72px; margin-left: -54px; bottom: 0; }
 html.overlay .pet img { width: 108px; height: 72px; }
 html.overlay .shadow { bottom: 3px; width: 36px; height: 8px; margin-left: -18px; }
 html.overlay .zzz, html.overlay .puzzle { font-size: 14px; top: 2px; right: 14px; }
-html.overlay .xp { display: flex; align-items: center; gap: 5px; cursor: grab; user-select: none; background: #fffdf7d9; border: 1px solid #2c3a3666; border-radius: 99px; padding: 2px 6px; }
-html.overlay .xp-row { margin: 0; font-size: 10px; order: 2; }
+html.overlay .xp { display: flex; align-items: center; gap: 5px; max-width: 188px; white-space: nowrap; cursor: grab; user-select: none; background: #fffdf7d9; border: 1px solid #2c3a3666; border-radius: 99px; padding: 2px 6px; }
+html.overlay .xp-row { margin: 0; font-size: 10px; order: 2; white-space: nowrap; }
+html.overlay .xp-row strong { font-size: 10.5px; }
 html.overlay .xp-row span { display: none; }
 html.overlay .bar { flex: none; width: 56px; height: 5px; order: 1; }
+/* Hovering adds the stage, XP and ✎: shrink the bar so the pill stays one line wide. */
+html.overlay .app:hover .bar { width: 28px; }
 html.overlay .stage.mini { display: inline; font-size: 9px; padding: 0 5px; order: 0; }
 /* Resting: just the dot and the bar. Hover shows the stage and XP number. */
 html.overlay .app:not(:hover) .xp-row, html.overlay .app:not(:hover) .stage.mini:not(.demo) { display: none; }

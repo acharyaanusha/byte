@@ -99,7 +99,7 @@ export interface PetState {
 export const SPECIES = ['dragon', 'fire', 'cat', 'robot'] as const;
 export type Species = (typeof SPECIES)[number];
 export const SPECIES_LABEL: Record<Species, string> = { dragon: 'Mint dragon', fire: 'Fire dragon', cat: 'Wizard cat', robot: 'Robot' };
-/** Target hue (degrees) for each color preset; "original" keeps the art as drawn. */
-export const COLORS = { original: null, mint: 150, sky: 205, lavender: 270, rose: 335, ember: 12, gold: 45 } as const;
+/** Target hue (degrees) for each color preset; "original" keeps the art as drawn; "black" darkens instead of shifting hue. */
+export const COLORS = { original: null, mint: 150, sky: 205, lavender: 270, rose: 335, ember: 12, gold: 45, black: 'black' } as const;
 export type ColorName = keyof typeof COLORS;
 export interface Appearance { species: Species; color: ColorName }

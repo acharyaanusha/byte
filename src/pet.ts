@@ -63,7 +63,7 @@ export function frameUrl(species: Species, color: ColorName, stage: Stage, pose 
  * hue, keeping their shading. Eyes, bellies, cheeks and accents (other hues or low
  * saturation) stay as drawn. Resolves to an object URL.
  */
-async function recolor(url: string, bodyHue: number, targetHue: number, tolerance: number): Promise<string> {
+async function recolor(url: string, bodyHue: number, targetHue: number | 'black', tolerance: number): Promise<string> {
   const img = new Image();
   img.src = url;
   await img.decode();
@@ -82,9 +82,11 @@ async function recolor(url: string, bodyHue: number, targetHue: number, toleranc
     h = (h * 60 + 360) % 360;
     const dist = Math.abs(((h - bodyHue + 540) % 360) - 180);
     if (dist > tolerance) continue;
-    // Same saturation/value, hue moved by the same offset (keeps the art's hue variation).
-    const nh = (h - bodyHue + targetHue + 360) % 360;
-    const s = delta / max, v = max;
+    // Black: a near-neutral charcoal that keeps the art's light and shade.
+    // Otherwise: same saturation/value, hue moved by the same offset (keeps the art's hue variation).
+    const black = targetHue === 'black';
+    const nh = black ? 230 : (h - bodyHue + (targetHue as number) + 360) % 360;
+    const s = black ? 0.12 : delta / max, v = black ? 0.12 + max * 0.33 : max;
     const k = (n: number) => (n + nh / 60) % 6;
     const f = (n: number) => v - v * s * Math.max(0, Math.min(k(n), 4 - k(n), 1));
     px[i] = Math.round(f(5) * 255); px[i + 1] = Math.round(f(3) * 255); px[i + 2] = Math.round(f(1) * 255);
