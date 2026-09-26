@@ -115,7 +115,7 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .xp-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-bottom: 5px; }
 .xp-row strong { color: var(--ink); font-size: 14px; }
 .bar { height: 12px; background: #eadfc4; border-radius: 99px; overflow: hidden; }
-.bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), var(--mint-deep)); border-radius: 99px; transition: width .8s cubic-bezier(.2,.8,.3,1); }
+.bar span { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, var(--mint), var(--mint-deep)); border-radius: 99px; transition: transform .8s cubic-bezier(.2,.8,.3,1); }
 
 .milestones h2 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
 .milestones ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }

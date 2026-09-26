@@ -143,7 +143,7 @@ function render() {
   const pct = hi === null ? 100 : ((s.xp - lo) / (hi - lo)) * 100;
   el.xp.textContent = `${s.xp} XP`;
   el.xpNext.textContent = hi === null ? 'Fully grown' : `${hi - s.xp} to ${nextStage}`;
-  el.barFill.style.width = `${Math.min(100, pct)}%`;
+  el.barFill.style.transform = `scaleX(${Math.min(100, pct) / 100})`;
   el.bar.setAttribute('aria-valuenow', String(Math.round(pct)));
 
   renderMilestones(s.milestoneHistory, now);
