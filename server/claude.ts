@@ -94,5 +94,7 @@ export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null
   const id = toolUseId
     ? `${sessionId}:${toolUseId}:${kind}`
     : `${sessionId}:${kind}:${stableId([turnId, raw.prompt, raw.source, raw.last_assistant_message, toolInput])}`;
-  return { id, sessionId, turnId, timestamp: now, kind, ...extra };
+  // hook_ts is stamped by the hook when Claude Code runs it, so ordering survives async delivery.
+  const timestamp = typeof raw.hook_ts === 'number' && Number.isFinite(raw.hook_ts) ? raw.hook_ts : now;
+  return { id, sessionId, turnId, timestamp, kind, ...extra };
 }

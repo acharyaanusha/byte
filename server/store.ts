@@ -5,7 +5,11 @@ import { initialState } from './state.js';
 
 export function loadState(file: string): PetState | null {
   try {
-    return { ...initialState(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Evidence saved by an older version has a different shape; the turn simply starts fresh.
+    if (saved.currentTurnEvidence && !Array.isArray(saved.currentTurnEvidence.events)) saved.currentTurnEvidence = null;
+    delete saved.recentEvents;
+    return { ...initialState(), ...saved };
   } catch {
     return null;
   }

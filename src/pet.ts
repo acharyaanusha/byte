@@ -8,7 +8,14 @@ type Mode = Behavior | 'wave';
 
 declare global {
   interface Window {
-    byteHost?: { moveBy(dx: number): Promise<{ hitEdge: boolean }>; onCommand?(cb: (cmd: string) => void): void };
+    byteHost?: {
+      moveBy(dx: number): Promise<{ hitEdge: boolean }>;
+      onCommand?(cb: (cmd: string) => void): void;
+      setInteractive?(on: boolean): void;
+      dragStart?(): void;
+      dragMove?(dx: number, dy: number): void;
+      dragEnd?(): void;
+    };
   }
 }
 
@@ -28,6 +35,8 @@ export class PetAnimator {
   private waveUntil = 0;
   private moving = false;
   private paused = false;
+  /** Set while the user drags the overlay: Byte stops walking. */
+  held = false;
 
   constructor(private root: HTMLElement, private img: HTMLImageElement, private flip: HTMLElement) {
     for (const s of ['hatchling', 'sprout', 'companion']) for (const p of POSES) new Image().src = this.src(s as Stage, p);
@@ -63,7 +72,7 @@ export class PetAnimator {
 
   /** Focused: walk most of the time with short pauses. Idle: an occasional short stroll. */
   private walking(now: number): boolean {
-    if (this.paused || now < this.waveUntil) return false;
+    if (this.paused || this.held || now < this.waveUntil) return false;
     if (this.mode === 'focused') return this.tick % 30 < 22;
     if (this.mode !== 'idle') return false;
     if (now >= this.nextStroll && now > this.strollUntil) {

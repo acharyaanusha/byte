@@ -156,7 +156,7 @@ html.overlay .banner.demo { font-size: 10px; padding: 3px 6px; order: -2; }
 html.overlay .caption {
   order: -1; position: relative; align-self: center; min-height: 0; max-width: 230px;
   font-size: 12.5px; padding: 6px 10px; border-radius: 12px; border: 1.5px solid #2c3a36; background: #fffdf7;
-  -webkit-app-region: drag; cursor: grab; box-shadow: 0 2px 0 #2c3a36;
+  cursor: grab; box-shadow: 0 2px 0 #2c3a36; user-select: none;
 }
 html.overlay .caption::after {
   content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px;
@@ -167,7 +167,7 @@ html.overlay .sun, html.overlay .hill, html.overlay .flash { display: none; }
 html.overlay .pet { width: 225px; height: 150px; margin-left: -112px; bottom: 0; }
 html.overlay .pet img { width: 225px; height: 150px; }
 html.overlay .shadow { bottom: 6px; width: 70px; margin-left: -35px; }
-html.overlay .xp { display: flex; align-items: center; gap: 6px; -webkit-app-region: drag; background: #fffdf7e6; border: 1.5px solid #2c3a36; border-radius: 99px; padding: 3px 8px; }
+html.overlay .xp { display: flex; align-items: center; gap: 6px; cursor: grab; user-select: none; background: #fffdf7e6; border: 1.5px solid #2c3a36; border-radius: 99px; padding: 3px 8px; }
 html.overlay .xp-row { margin: 0; font-size: 11px; order: 2; }
 html.overlay .xp-row span { display: none; }
 html.overlay .bar { flex: 1; height: 7px; order: 1; }

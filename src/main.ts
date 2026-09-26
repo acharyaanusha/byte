@@ -35,6 +35,8 @@ let shownStage: Stage | null = null;
 let lastGrewAt = 0;
 let petCaptionUntil = 0;
 let stopReplay: (() => void) | null = null;
+/** Bumped on every replay start/exit so a live poll already in flight can't overwrite demo state. */
+let replayGen = 0;
 
 const animator = new PetAnimator(el.pet, el.sprite, el.flip);
 
@@ -156,18 +158,25 @@ function render() {
 
 async function poll() {
   if (stopReplay) return;
+  const gen = replayGen;
+  let next: PublicState | null = null;
+  let failed = false;
   try {
     const res = await fetch('/api/state', { cache: 'no-store' });
     if (!res.ok) throw new Error(String(res.status));
-    latest = await res.json();
-    offline = false;
+    next = await res.json();
   } catch {
-    offline = true;
+    failed = true;
   }
+  // The demo started (or restarted) while this request was in flight: drop the live answer.
+  if (stopReplay || gen !== replayGen) return;
+  if (next) latest = next;
+  offline = failed;
   render();
 }
 
 el.pet.addEventListener('click', () => {
+  if (justDragged) return;
   petCaptionUntil = Date.now() + 1800;
   animator.wave();
   for (let i = 0; i < 4; i++) {
@@ -185,6 +194,7 @@ el.pet.addEventListener('click', () => {
 
 function toggleReplay() {
   if (stopReplay) { exitReplay(); return; }
+  replayGen++;
   shownStage = null; lastGrewAt = Date.now();
   stopReplay = startReplay((s: PetState) => { latest = publicState(s, Date.now()); render(); }, exitReplay);
   render();
@@ -195,6 +205,7 @@ window.byteHost?.onCommand?.((cmd) => { if (cmd === 'replay') toggleReplay(); })
 function exitReplay() {
   stopReplay?.();
   stopReplay = null;
+  replayGen++;
   shownStage = null; lastGrewAt = Number.MAX_SAFE_INTEGER; // no growth flash when returning to live
   latest = null;
   void poll().then(() => { lastGrewAt = latest?.grewAt ?? 0; });
@@ -204,6 +215,43 @@ el.disconnect.addEventListener('click', async () => {
   try { await fetch('/api/disconnect', { method: 'POST' }); } catch { /* offline: nothing to release */ }
   void poll();
 });
+
+// Overlay host: capture the mouse only over Byte's visible parts, and drag the window by them.
+let justDragged = false;
+const host = window.byteHost;
+if (overlay && host?.setInteractive) {
+  const handles = ['#pet', '#caption', '.xp', '#demo-banner'];
+  const isHandle = (t: EventTarget | null) => t instanceof Element && handles.some((h) => t.closest(h));
+  let interactive = false;
+  let drag: { x: number; y: number; moved: boolean } | null = null;
+  window.addEventListener('mousemove', (e) => {
+    const want = !!drag || isHandle(e.target);
+    if (want !== interactive) { interactive = want; host.setInteractive!(want); }
+  });
+  window.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !isHandle(e.target)) return;
+    drag = { x: e.screenX, y: e.screenY, moved: false };
+    justDragged = false;
+    animator.held = true;
+    host.dragStart!();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.screenX - drag.x, dy = e.screenY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+    host.dragMove!(dx, dy);
+  });
+  window.addEventListener('pointerup', () => {
+    if (!drag) return;
+    justDragged = drag.moved; // a real drag should not also count as petting
+    drag = null;
+    animator.held = false;
+    host.dragEnd!();
+    setTimeout(() => { justDragged = false; }, 0);
+  });
+}
 
 setInterval(() => void poll(), 1000);
 setInterval(render, 500);

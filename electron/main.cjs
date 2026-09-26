@@ -1,6 +1,7 @@
 // Byte overlay: a small transparent, frameless, always-on-top window that floats
 // over your terminal or coding app. It loads the same UI in ?overlay mode.
-// Drag it by the speech bubble or XP bar; right-click for the menu.
+// Only Byte, its bubble and its XP bar catch the mouse; everything else clicks
+// through to the apps underneath. Drag Byte anywhere; right-click for the menu.
 const { app, BrowserWindow, ipcMain, Menu, screen, shell } = require('electron');
 const path = require('node:path');
 
@@ -21,6 +22,8 @@ function create() {
   // Stay above full-screen apps and follow you across Spaces.
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Click-through by default; the page turns mouse capture on while the pointer is over Byte.
+  win.setIgnoreMouseEvents(true, { forward: true });
   win.loadURL(`${UI}?overlay=1`);
   win.webContents.on('context-menu', () => {
     Menu.buildFromTemplate([
@@ -32,9 +35,21 @@ function create() {
   });
 }
 
+ipcMain.on('byte:interactive', (_e, on) => {
+  if (win) win.setIgnoreMouseEvents(!on, { forward: true });
+});
+
+// Dragging: the page reports the pointer's total offset since drag start.
+let dragOrigin = null;
+ipcMain.on('byte:dragStart', () => { if (win) dragOrigin = win.getPosition(); });
+ipcMain.on('byte:dragMove', (_e, dx, dy) => {
+  if (win && dragOrigin) win.setPosition(Math.round(dragOrigin[0] + dx), Math.round(dragOrigin[1] + dy));
+});
+ipcMain.on('byte:dragEnd', () => { dragOrigin = null; });
+
 // Walking: move the window horizontally, clamped to the display it is on.
 ipcMain.handle('byte:moveBy', (_e, dx) => {
-  if (!win) return { hitEdge: true };
+  if (!win || dragOrigin) return { hitEdge: false };
   const [x, y] = win.getPosition();
   const { workArea } = screen.getDisplayMatching(win.getBounds());
   const min = workArea.x, max = workArea.x + workArea.width - W;

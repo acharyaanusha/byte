@@ -55,14 +55,34 @@ async function generate(prompt, refPng) {
   }
 }
 
-/** Keys out magenta and trims to the character. */
+/**
+ * Keys out magenta and trims to the character. Pixel art wants hard alpha, so:
+ * clearly-magenta pixels go transparent, then two passes peel off pinkish edge
+ * pixels that touch transparency (the anti-aliased fringe), and any tint left is
+ * pulled out of the colors (despill).
+ */
 async function keyed(raw) {
   const { data, info } = await sharp(raw).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H } = info;
+  const tint = (i) => Math.min(data[i], data[i + 2]) - data[i + 1];
+  for (let i = 0; i < data.length; i += 4) if (tint(i) > 60) data[i + 3] = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    const clear = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (data[i + 3] === 0 || tint(i) <= 15) continue;
+      const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+        const nx = x + dx, ny = y + dy;
+        return nx < 0 || ny < 0 || nx >= W || ny >= H || data[((ny * W) + nx) * 4 + 3] === 0;
+      });
+      if (edge) clear.push(i);
+    }
+    for (const i of clear) data[i + 3] = 0;
+  }
   for (let i = 0; i < data.length; i += 4) {
-    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
-    const m = Math.min(r, b) - g;
-    if (m > 90) data[i + 3] = 0;
-    else if (m > 50) { data[i] = Math.min(r, g + 30); data[i + 2] = Math.min(b, g + 30); }
+    if (data[i + 3] === 0) continue;
+    data[i + 3] = 255;
+    if (tint(i) > 15) { const g = data[i + 1]; data[i] = Math.min(data[i], g + 15); data[i + 2] = Math.min(data[i + 2], g + 15); }
   }
   return sharp(await sharp(data, { raw: info }).png().toBuffer()).trim({ threshold: 1 }).toBuffer();
 }

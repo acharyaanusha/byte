@@ -31,19 +31,23 @@ export function createByte(opts: ByteOptions) {
   const scheduler = new JudgeScheduler(async () => {
     const ev = state.currentTurnEvidence;
     if (!ev) return;
-    const turnId = ev.turnId; // captured now: a late reply must not touch a newer turn
+    // Captured now: a late reply must not touch a newer turn or newer evidence in this turn.
+    const turnId = ev.turnId;
+    const version = ev.version;
     if (!opts.apiKey) { set(markDegraded(state)); return; }
     let judgment: PetJudgment;
     try {
-      judgment = await (opts.judgeImpl ?? judge)(state.recentEvents, ev, { apiKey: opts.apiKey });
+      judgment = await (opts.judgeImpl ?? judge)(ev, { apiKey: opts.apiKey });
     } catch (err) {
       log(`jev failed turn=${turnId}: ${(err as Error).name}: ${(err as Error).message}`);
       set(markDegraded(state));
       return;
     }
-    const { state: next, awarded } = applyJudgment(state, judgment, turnId, Date.now());
-    const stale = state.currentTurnEvidence?.turnId !== turnId;
-    log(`jev turn=${turnId} activity=${judgment.activity} milestone=${judgment.milestone} p=${judgment.milestoneProbability.toFixed(2)} attention=${judgment.needsAttention.toFixed(2)} ${judgment.latencyMs ?? '?'}ms awarded=${awarded}${stale ? ' (stale, ignored)' : ''}`);
+    const { state: next, awarded, superseded } = applyJudgment(state, judgment, turnId, Date.now(), version);
+    const stale = !!superseded;
+    // Newer evidence arrived while Jev was thinking: judge the current snapshot next.
+    if (stale && state.currentTurnEvidence?.turnId === turnId) scheduler.request();
+    log(`jev turn=${turnId} v${version} activity=${judgment.activity} milestone=${judgment.milestone} p=${judgment.milestoneProbability.toFixed(2)} attention=${judgment.needsAttention.toFixed(2)} ${judgment.latencyMs ?? '?'}ms awarded=${awarded}${stale ? ' (superseded, ignored)' : ''}`);
     set(next);
   }, opts.schedule);
 

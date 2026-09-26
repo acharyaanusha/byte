@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Installs (or removes) Byte's hooks in <repo>/.claude/settings.local.json.
 // Merges only Byte's entries, preserves everything else, backs up the file,
-// and is idempotent. Never touches global Claude settings.
-//   node scripts/install-hooks.mjs <repo>           install
-//   node scripts/install-hooks.mjs <repo> --remove  uninstall
+// and is idempotent.
+//   node scripts/install-hooks.mjs <repo>              install for one repo (.claude/settings.local.json)
+//   node scripts/install-hooks.mjs <repo> --remove     uninstall from that repo
+//   node scripts/install-hooks.mjs --global            install for every Claude Code session (~/.claude/settings.json)
+//   node scripts/install-hooks.mjs --global --remove   uninstall globally
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,12 +46,17 @@ export function mergeHooks(settings, { remove = false, hookPath = HOOK } = {}) {
 }
 
 function main() {
-  const [repo, flag] = process.argv.slice(2);
-  if (!repo) {
-    console.error('usage: node scripts/install-hooks.mjs <repo> [--remove]');
+  const args = process.argv.slice(2);
+  const global = args.includes('--global');
+  const flag = args.includes('--remove') ? '--remove' : undefined;
+  const repo = args.find((a) => !a.startsWith('--'));
+  if (!global && !repo) {
+    console.error('usage: node scripts/install-hooks.mjs <repo> [--remove]\n       node scripts/install-hooks.mjs --global [--remove]');
     process.exit(1);
   }
-  const target = path.resolve(repo, '.claude', 'settings.local.json');
+  const target = global
+    ? path.join(os.homedir(), '.claude', 'settings.json')
+    : path.resolve(repo, '.claude', 'settings.local.json');
   console.log(`Target: ${target}`);
   let settings = {};
   let original = null;
@@ -74,7 +82,7 @@ function main() {
     console.log(`Backup: ${backup}`);
   }
   fs.writeFileSync(target, out);
-  console.log(flag === '--remove' ? 'Removed Byte hooks.' : 'Installed Byte hooks. Restart Claude Code in that repo to pick them up.');
+  console.log(flag === '--remove' ? 'Removed Byte hooks.' : `Installed Byte hooks. Restart Claude Code${global ? ' sessions' : ' in that repo'} to pick them up.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

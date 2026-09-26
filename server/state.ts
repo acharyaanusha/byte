@@ -38,34 +38,65 @@ export function initialState(): PetState {
     celebrateUntil: 0, grewAt: 0, lastEventAt: 0,
     activeSessionId: null, otherSessionAt: 0, connection: 'waiting',
     milestoneHistory: [], awardedTurnIds: [], seenEventIds: [],
-    currentTurnEvidence: null, recentEvents: [], lastJudgment: null,
+    currentTurnEvidence: null, pastTurnIds: [], lastJudgment: null,
   };
 }
+
+const MAX_TURN_EVENTS = 200;
+/** A new session that starts can replace a bound session idle this long. A new prompt always takes over. */
+export const TAKEOVER_MS = 60_000;
 
 export function newEvidence(turnId: string, promptExcerpt = ''): TurnEvidence {
   return {
-    turnId, promptExcerpt, failed: {}, editSinceLastPass: false, sawEdit: false,
-    recoveredCheck: null, verifiedCheck: null,
+    turnId, promptExcerpt, events: [], version: 0, failed: {}, editSinceLastPass: false, sawEdit: false,
+    recoveredCheck: null, verifiedCheck: null, trailIds: [],
   };
 }
 
-/** Folds one event into the turn's evidence. Returns a new object. */
-export function updateEvidence(ev: TurnEvidence, event: PetEvent): TurnEvidence {
-  const next: TurnEvidence = { ...ev, failed: { ...ev.failed } };
-  if (event.kind === 'edit') {
-    next.sawEdit = true;
-    next.editSinceLastPass = true;
-    for (const k of Object.keys(next.failed)) next.failed[k] = { editedSince: true };
-  } else if (event.kind === 'command_failed' && event.check) {
-    next.failed[event.check] = { editedSince: false };
-  } else if (event.kind === 'command_ok' && event.check && event.checkPassed) {
-    const f = next.failed[event.check];
-    if (f?.editedSince) next.recoveredCheck = event.check;
-    else if (next.editSinceLastPass) next.verifiedCheck ??= event.check;
-    if (f) delete next.failed[event.check];
-    next.editSinceLastPass = false;
+/**
+ * Re-derives the milestone evidence by folding the turn's events in hook-time
+ * order. Folding from scratch makes late (out-of-order) deliveries land in the
+ * right place instead of being judged in arrival order.
+ */
+export function deriveEvidence(ev: TurnEvidence): TurnEvidence {
+  const failed: Record<string, { editedSince: boolean; failId: string; editId?: string }> = {};
+  let editSinceLastPass = false, sawEdit = false, lastEditId = '';
+  let recoveredCheck: string | null = null, verifiedCheck: string | null = null;
+  let trailIds: string[] = [];
+  for (const e of ev.events) {
+    if (e.kind === 'edit') {
+      sawEdit = true; editSinceLastPass = true; lastEditId = e.id;
+      for (const f of Object.values(failed)) if (!f.editedSince) { f.editedSince = true; f.editId = e.id; }
+    } else if (e.kind === 'command_failed' && e.check) {
+      failed[e.check] = { editedSince: false, failId: e.id };
+    } else if (e.kind === 'command_ok' && e.check && e.checkPassed) {
+      const f = failed[e.check];
+      if (f?.editedSince) {
+        if (!recoveredCheck) trailIds = [f.failId, f.editId!, e.id];
+        recoveredCheck ??= e.check;
+      } else if (editSinceLastPass && !verifiedCheck) {
+        verifiedCheck = e.check;
+        if (!recoveredCheck) trailIds = [lastEditId, e.id];
+      }
+      delete failed[e.check];
+      editSinceLastPass = false;
+    }
   }
-  return next;
+  const failedOut = Object.fromEntries(Object.entries(failed).map(([k, v]) => [k, { editedSince: v.editedSince }]));
+  return { ...ev, failed: failedOut, editSinceLastPass, sawEdit, recoveredCheck, verifiedCheck, trailIds };
+}
+
+const RELEVANT = new Set(['edit', 'command_failed', 'command_ok']);
+
+/** Inserts an event in hook-time order and re-derives the evidence. */
+export function addToEvidence(ev: TurnEvidence, event: PetEvent): TurnEvidence {
+  const events = [...ev.events];
+  let i = events.length;
+  while (i > 0 && events[i - 1].timestamp > event.timestamp) i--;
+  events.splice(i, 0, event);
+  if (events.length > MAX_TURN_EVENTS) events.splice(0, events.length - MAX_TURN_EVENTS);
+  const relevant = RELEVANT.has(event.kind) && (event.kind === 'edit' || !!event.check);
+  return deriveEvidence({ ...ev, events, version: ev.version + (relevant ? 1 : 0) });
 }
 
 /** Which milestones the local evidence supports. Recovery implies verified progress. */
@@ -74,6 +105,14 @@ export function eligibleMilestones(ev: TurnEvidence | null): MilestoneKind[] {
   if (ev.recoveredCheck) return ['recovered_from_failure', 'verified_progress'];
   if (ev.verifiedCheck) return ['verified_progress'];
   return [];
+}
+
+/** What Jev sees: the milestone trail (even if older) plus the last 12 events. */
+export function jevEvents(ev: TurnEvidence): { trail: PetEvent[]; recent: PetEvent[] } {
+  const recent = ev.events.slice(-MAX_RECENT);
+  const recentIds = new Set(recent.map((e) => e.id));
+  const trail = ev.events.filter((e) => ev.trailIds.includes(e.id) && !recentIds.has(e.id));
+  return { trail, recent };
 }
 
 function localBehavior(kind: PetEvent['kind']): [Behavior, string] | null {
@@ -96,34 +135,46 @@ function bounded<T>(list: T[], item: T, max: number): T[] {
 export type EventOutcome = 'applied' | 'duplicate' | 'other_session';
 
 /**
- * Applies one normalized event. Binds the first session it sees, ignores other
- * sessions, drops duplicates, and tracks the current turn's evidence.
+ * Applies one normalized event. Byte follows one session at a time: the one you
+ * last typed a prompt into (or a newly started session once the bound one has
+ * been quiet for TAKEOVER_MS). Tool events from other sessions are ignored.
+ * Drops duplicates and tracks the current turn's evidence in hook-time order.
  */
 export function reduceEvent(state: PetState, event: PetEvent): { state: PetState; outcome: EventOutcome } {
   if (state.seenEventIds.includes(event.id)) return { state, outcome: 'duplicate' };
-  if (state.activeSessionId && state.activeSessionId !== event.sessionId) {
-    return { state: { ...state, otherSessionAt: event.timestamp }, outcome: 'other_session' };
+  let s: PetState = state;
+  if (s.activeSessionId && s.activeSessionId !== event.sessionId) {
+    const takesOver = event.kind === 'prompt'
+      || (event.kind === 'session_start' && event.timestamp - s.lastEventAt >= TAKEOVER_MS);
+    if (!takesOver) {
+      return { state: { ...s, otherSessionAt: event.timestamp }, outcome: 'other_session' };
+    }
+    s = { ...s, activeSessionId: event.sessionId, currentTurnEvidence: null, otherSessionAt: 0 };
   }
-  let s: PetState = {
-    ...state,
-    activeSessionId: state.activeSessionId ?? event.sessionId,
-    seenEventIds: bounded(state.seenEventIds, event.id, MAX_IDS),
-    lastEventAt: event.timestamp,
+  const latest = event.timestamp >= s.lastEventAt;
+  s = {
+    ...s,
+    activeSessionId: s.activeSessionId ?? event.sessionId,
+    seenEventIds: bounded(s.seenEventIds, event.id, MAX_IDS),
+    lastEventAt: Math.max(s.lastEventAt, event.timestamp),
   };
 
-  if (event.kind === 'prompt' && event.turnId) {
-    s.currentTurnEvidence = newEvidence(event.turnId, event.promptExcerpt ?? '');
-    s.recentEvents = [];
+  const t = event.turnId;
+  let ev = s.currentTurnEvidence;
+  if (t && ev?.turnId !== t && !s.pastTurnIds.includes(t) && event.kind !== 'session_start') {
+    // A new turn: opened by its prompt, or by a tool event that beat the prompt here.
+    if (ev) s.pastTurnIds = bounded(s.pastTurnIds, ev.turnId, MAX_IDS);
+    ev = newEvidence(t);
   }
-  const ev = s.currentTurnEvidence;
-  // Only events in the known current turn count as evidence.
-  if (ev && event.turnId === ev.turnId && event.kind !== 'prompt') {
-    s.currentTurnEvidence = updateEvidence(ev, event);
+  if (ev && t === ev.turnId) {
+    if (event.kind === 'prompt') ev = { ...ev, promptExcerpt: event.promptExcerpt ?? '' };
+    else if (event.kind !== 'session_start') ev = addToEvidence(ev, event);
   }
-  if (ev && event.turnId === ev.turnId) s.recentEvents = bounded(s.recentEvents, event, MAX_RECENT);
+  s.currentTurnEvidence = ev ?? null;
 
+  // A late delivery must not snap the pet back to an older mood.
   const look = localBehavior(event.kind);
-  if (look && event.timestamp >= s.celebrateUntil) {
+  if (look && latest && event.timestamp >= s.celebrateUntil) {
     const [behavior, caption] = look;
     const passed = event.kind === 'command_ok' && event.checkPassed;
     s = { ...s, behavior, caption: passed ? CAPTIONS.passed : caption };
@@ -138,11 +189,16 @@ const ACTIVITY_BEHAVIOR: Record<PetJudgment['activity'], Behavior> = {
 /**
  * Applies Jev's judgment for `turnId`. XP is awarded only when the local
  * evidence supports the milestone Jev picked, with probability >= 0.8, and the
- * turn has not been awarded before. A reply for an old turn is ignored.
+ * turn has not been awarded before. A reply for an old turn, or for an older
+ * version of this turn's evidence, is ignored.
  */
-export function applyJudgment(state: PetState, judgment: PetJudgment, turnId: string, now: number): { state: PetState; awarded: number } {
+export function applyJudgment(
+  state: PetState, judgment: PetJudgment, turnId: string, now: number, evidenceVersion?: number,
+): { state: PetState; awarded: number; superseded?: boolean } {
   const ev = state.currentTurnEvidence;
-  if (!ev || ev.turnId !== turnId) return { state, awarded: 0 };
+  if (!ev || ev.turnId !== turnId) return { state, awarded: 0, superseded: true };
+  // Jev judged an older snapshot of this turn; a queued re-evaluation will judge the current one.
+  if (evidenceVersion !== undefined && evidenceVersion !== ev.version) return { state, awarded: 0, superseded: true };
 
   const choice: MilestoneChoice = judgment.milestone;
   const eligible =
@@ -189,12 +245,12 @@ export function markDegraded(state: PetState): PetState {
 }
 
 export function disconnect(state: PetState): PetState {
-  return { ...state, activeSessionId: null, currentTurnEvidence: null, recentEvents: [], behavior: 'idle', caption: CAPTIONS.hello };
+  return { ...state, activeSessionId: null, currentTurnEvidence: null, behavior: 'idle', caption: CAPTIONS.hello };
 }
 
 /** What the browser sees: no dedup bookkeeping, no raw event outputs. */
 export function publicState(state: PetState, now: number) {
-  const { seenEventIds, awardedTurnIds, recentEvents, currentTurnEvidence, ...rest } = state;
+  const { seenEventIds, awardedTurnIds, pastTurnIds, currentTurnEvidence, ...rest } = state;
   return {
     ...rest,
     now,
@@ -205,7 +261,7 @@ export function publicState(state: PetState, now: number) {
       recoveredCheck: currentTurnEvidence.recoveredCheck,
       verifiedCheck: currentTurnEvidence.verifiedCheck,
     },
-    recent: recentEvents.slice(-5).map((e) => ({ kind: e.kind, check: e.check, checkPassed: e.checkPassed })),
+    recent: (currentTurnEvidence?.events ?? []).slice(-5).map((e) => ({ kind: e.kind, check: e.check, checkPassed: e.checkPassed })),
   };
 }
 export type PublicState = ReturnType<typeof publicState>;

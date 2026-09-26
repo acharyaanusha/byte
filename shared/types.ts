@@ -32,12 +32,18 @@ export interface PetJudgment {
 export interface TurnEvidence {
   turnId: string;
   promptExcerpt: string;
-  /** Checks that failed this turn, and whether an edit followed each failure. */
+  /** Every event of the turn, sorted by hook time (async hooks can arrive out of order). Bounded. */
+  events: PetEvent[];
+  /** Bumped whenever milestone-relevant evidence changes; a Jev reply for an older version is superseded. */
+  version: number;
+  /** Derived by folding `events` in order: */
   failed: Record<string, { editedSince: boolean }>;
   editSinceLastPass: boolean;
   sawEdit: boolean;
   recoveredCheck: string | null;
   verifiedCheck: string | null;
+  /** Ids of the events that prove the milestone (failure, edit, pass), kept for Jev even when older than the last 12. */
+  trailIds: string[];
 }
 
 export type Stage = 'hatchling' | 'sprout' | 'companion';
@@ -69,7 +75,7 @@ export interface PetState {
   awardedTurnIds: string[];
   seenEventIds: string[];
   currentTurnEvidence: TurnEvidence | null;
-  /** Last 12 events of the current turn: the bounded summary sent to Jev. */
-  recentEvents: PetEvent[];
+  /** Turns that are over; late events for them never count as evidence. Bounded. */
+  pastTurnIds: string[];
   lastJudgment: (PetJudgment & { turnId: string; at: number; awarded: boolean }) | null;
 }

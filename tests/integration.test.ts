@@ -10,8 +10,9 @@ import { parseJudgment } from '../server/jev.js';
 import type { PetJudgment } from '../shared/types.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'byte-'));
+let ts = 1000;
 const hook = (name: string, extra: Record<string, unknown> = {}) =>
-  ({ session_id: 'S', prompt_id: 'P1', hook_event_name: name, ...extra });
+  ({ session_id: 'S', prompt_id: 'P1', hook_event_name: name, hook_ts: ts++, ...extra });
 const bash = (id: string, ok: boolean, out: string) =>
   ok
     ? hook('PostToolUse', { tool_name: 'Bash', tool_use_id: id, tool_input: { command: 'npm test' }, tool_response: { stdout: out, stderr: '', interrupted: false } })
@@ -64,6 +65,28 @@ describe('server + Jev', () => {
     release({ activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.99, needsAttention: 0 });
     await wait(20);
     expect(b.getState().xp).toBe(0);
+  });
+});
+
+describe('superseded same-turn judgments (server)', () => {
+  it('a reply computed before newer evidence is ignored, then the re-evaluation awards exactly once', async () => {
+    const replies: ((j: PetJudgment) => void)[] = [];
+    const b = byte(() => new Promise((r) => { replies.push(r); }));
+    b.ingest(recoverySession[0]);
+    b.ingest(recoverySession[1]); // failure → Jev run #1 starts on this snapshot
+    await wait(30);
+    expect(replies).toHaveLength(1);
+    b.ingest(recoverySession[2]); // edit
+    b.ingest(recoverySession[3]); // pass
+    const good: PetJudgment = { activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.99, needsAttention: 0 };
+    replies[0](good); // stale snapshot: must not award
+    await wait(30);
+    expect(b.getState().xp).toBe(0);
+    expect(replies).toHaveLength(2);
+    replies[1](good);
+    await wait(30);
+    expect(b.getState().xp).toBe(20);
+    expect(b.getState().milestoneHistory).toHaveLength(1);
   });
 });
 

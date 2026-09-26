@@ -3,6 +3,9 @@
 // bounded subset, and POSTs it to the local Byte server with a 300 ms timeout.
 // It never writes to stdout, never blocks, and always exits 0.
 const URL = process.env.BYTE_URL ?? 'http://127.0.0.1:4317/events';
+// Stamped before anything else: async hooks may be delivered out of order, so the
+// server orders a turn's events by this time, not by arrival.
+const HOOK_TS = Date.now();
 const cut = (s, n, fromEnd = false) =>
   typeof s !== 'string' ? undefined : s.length <= n ? s : fromEnd ? s.slice(-n) : s.slice(0, n);
 
@@ -17,6 +20,7 @@ async function main() {
   const tr = raw.tool_response ?? {};
   // No file bodies, no environment: just what Byte needs to judge the turn.
   const payload = {
+    hook_ts: HOOK_TS,
     session_id: raw.session_id,
     prompt_id: raw.prompt_id,
     hook_event_name: raw.hook_event_name,

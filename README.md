@@ -35,6 +35,9 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 - **Behaviors (frame-animated):** idle (standing, blinking, the odd stroll), focused (walks back and forth while your agent works; in the overlay the whole window walks along your screen), puzzled (scratching its head after a failed command), celebrating (jumping, 4 s), sleeping (curled up after 90 s with no activity). Clicking Byte makes it wave. Growing to a new stage adds a flash and a scale pop. Byte holds each ordinary behavior for at least 3 s so it doesn't flicker.
 - **Turns:** each event's Claude Code `prompt_id` is its turn ID. A Jev reply for an older turn is ignored, so it can't award XP to a newer one.
+- **Superseded replies:** each turn's evidence has a version. If new evidence lands while Jev is thinking, that reply is dropped and the current evidence is judged next.
+- **Out-of-order hooks:** async hooks can arrive out of order, so the hook stamps each event when Claude Code runs it. The server re-derives the turn's evidence in that order. A tool event that beats its prompt still opens the turn.
+- **Long turns:** evidence covers the whole turn (up to 200 events). Jev also sees the failure → edit → pass trail when it's older than the last 12 events.
 - **Supported checks:** `npm test`, `npm run test`, `npm run typecheck`. A passing run must also show recognizable output (node:test, vitest or jest summaries; no `error TS` for typecheck). Compound shell commands (`&&`, `|`, `;` …) can change Byte's mood but can't earn XP.
 - **What Jev sees:** the prompt excerpt (≤ 500 chars) and the turn's last 12 events, with command output tails of ≤ 500 chars each and ≤ 8,000 chars in total. File contents, environment and anything that looks like a key are left out. The prompt tells Jev to treat all of it as evidence, not instructions.
 
@@ -53,26 +56,33 @@ Then either:
 - **Overlay (recommended):** `npm run overlay` opens a transparent, frameless, always-on-top Byte that floats above every app, including full-screen terminals, and follows you across Spaces. Drag it by the speech bubble or the XP bar. Right-click it to open the full view, replay the demo, or quit.
 - **Browser:** open http://127.0.0.1:5173 in a narrow window (about 360 × 480) for the full view with milestones and Jev details.
 
-### Install the hooks in a repo
+### Install the hooks
+
+**Every Claude Code session (recommended):**
+
+```bash
+npm run install-hooks -- --global      # merges Byte's hooks into ~/.claude/settings.json
+```
+
+**Or just one repo:**
 
 ```bash
 npm run install-hooks -- /path/to/your/repo
 ```
 
-This prints the target path, backs up the file, and merges only Byte's entries into
-`<repo>/.claude/settings.local.json`. Your existing settings and hooks stay as they are, and running it
-again changes nothing. Global Claude settings are never touched. If the file isn't valid JSON, the installer leaves it alone and reports the error.
-Restart Claude Code in that repo afterwards.
+The installer prints the target path, backs up the file, and merges only Byte's entries. Your existing settings and hooks stay as they are, and running it
+again changes nothing. The repo mode never touches global settings. If the file isn't valid JSON, the installer leaves it alone and reports the error.
+Restart Claude Code afterwards (running sessions may also pick the hooks up live).
 
-**Remove:** `npm run install-hooks -- /path/to/your/repo --remove` (or restore the `.byte-backup-*` file).
+**Remove:** `npm run install-hooks -- --global --remove` or `npm run install-hooks -- /path/to/your/repo --remove` (or restore the `.byte-backup-*` file).
 
 The hooks are `async` command hooks for SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure and Stop.
 The tool hooks only match Read, Grep, Glob, Edit, Write and Bash. The hook script always exits 0 and writes nothing to stdout, even when the Byte server isn't running.
 
 ### Sessions
 
-Byte follows the first Claude Code session it sees. Events from other sessions are ignored, and a banner says another session is active.
-**Disconnect** releases the session, so the next session to send an event takes over. Progress lives in `.byte/pet.json` and survives restarts and page reloads.
+Byte follows one Claude Code session at a time: **the one you last typed a prompt into**. Tool events from other sessions are ignored, and a banner says another session is active. A newly started session takes over once the current one has been quiet for a minute.
+**Disconnect** releases the session. Progress lives in `.byte/pet.json` and survives restarts and page reloads.
 
 ## Demo (60 seconds)
 
