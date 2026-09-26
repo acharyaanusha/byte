@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Byte: your coding companion grows with every little breakthrough." />
+    <link rel="icon" href="/pet/hatchling.png" />
+    <title>Byte</title>
+  </head>
+  <body>
+    <main class="app" id="app">
+      <div class="banner demo" id="demo-banner" hidden>Demo — simulated events and decisions</div>
+      <div class="banner warn" id="other-banner" hidden>A different Claude Code session is active. Byte is following the first one.</div>
+
+      <header class="top">
+        <div class="name">
+          <h1>Byte</h1>
+          <span class="stage" id="stage">Hatchling</span>
+        </div>
+        <div class="conn" id="conn" data-conn="waiting" title="">
+          <span class="dot"></span><span id="conn-label">Waiting</span>
+        </div>
+      </header>
+
+      <section class="habitat" id="habitat" aria-label="Byte's habitat">
+        <div class="sun"></div>
+        <div class="hill"></div>
+        <button class="pet" id="pet" data-behavior="idle" aria-label="Pet Byte">
+          <span class="shadow"></span>
+          <img id="sprite" src="/pet/hatchling.png" alt="Byte the dragon" width="184" height="184" draggable="false" />
+          <span class="zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
+          <span class="puzzle" aria-hidden="true">?</span>
+        </button>
+        <div class="hearts" id="hearts" aria-hidden="true"></div>
+        <div class="flash" id="flash" aria-hidden="true"></div>
+      </section>
+
+      <p class="caption" id="caption" aria-live="polite">Hi! I’m Byte.</p>
+
+      <section class="xp">
+        <div class="xp-row"><strong id="xp">0 XP</strong><span id="xp-next">20 to sprout</span></div>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar"><span id="bar-fill"></span></div>
+      </section>
+
+      <section class="milestones">
+        <h2>Milestones</h2>
+        <ol id="milestones"><li class="empty">None yet. Fix a failing test to feed Byte.</li></ol>
+      </section>
+
+      <details class="details" id="details">
+        <summary>Jev details</summary>
+        <div id="details-body"><p class="muted">No Jev decision yet.</p></div>
+      </details>
+
+      <footer class="actions">
+        <button class="btn" id="replay">Replay demo</button>
+        <button class="btn ghost" id="disconnect">Disconnect</button>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
