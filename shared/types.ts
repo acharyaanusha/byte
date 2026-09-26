@@ -7,6 +7,8 @@ export interface PetEvent {
   turnId: string | null;
   timestamp: number;
   kind: EventKind;
+  /** Which coding agent sent it. */
+  agent?: 'claude' | 'codex' | 'gemini';
   /** Raw command text (bounded) for Bash events. */
   command?: string;
   /** Canonical check ("npm test", "npm run typecheck") when the command is a supported check. */
@@ -74,6 +76,8 @@ export interface PetState {
   grewAt: number;
   lastEventAt: number;
   activeSessionId: string | null;
+  /** The coding agent of the followed session. */
+  activeAgent?: 'claude' | 'codex' | 'gemini';
   otherSessionAt: number;
   connection: Connection;
   milestoneHistory: MilestoneRecord[];

@@ -115,7 +115,7 @@ describe('scheduler', () => {
 
 describe('hook transport', () => {
   it('exits 0 with no stdout when the server is offline', () => {
-    const r = spawnSync('node', ['scripts/claude-hook.mjs'], {
+    const r = spawnSync('node', ['scripts/byte-hook.mjs'], {
       input: JSON.stringify(recoverySession[0]),
       env: { ...process.env, BYTE_URL: 'http://127.0.0.1:9/events' },
     });
@@ -123,7 +123,7 @@ describe('hook transport', () => {
     expect(r.stdout.toString()).toBe('');
   });
   it('exits 0 on garbage input', () => {
-    const r = spawnSync('node', ['scripts/claude-hook.mjs'], { input: 'not json' });
+    const r = spawnSync('node', ['scripts/byte-hook.mjs'], { input: 'not json' });
     expect(r.status).toBe(0);
     expect(r.stdout.toString()).toBe('');
   });
@@ -135,7 +135,7 @@ describe('installer', () => {
       permissions: { allow: ['Bash(ls)'] },
       hooks: { PostToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './mine.sh' }] }] },
     };
-    const hookPath = '/x/byte/scripts/claude-hook.mjs';
+    const hookPath = '/x/byte/scripts/byte-hook.mjs';
     const once = mergeHooks(existing, { hookPath });
     const twice = mergeHooks(once, { hookPath });
     expect(twice).toEqual(once);

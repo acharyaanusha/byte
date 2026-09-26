@@ -1,0 +1,24 @@
+{
+  "_note": "Real payloads captured from Codex CLI 0.155.1 (codex exec) on 2026-09-26; paths sanitized. The run stopped at the usage limit after UserPromptSubmit, so tool events are in codex-tool-events.json.",
+  "events": [
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "transcript_path": "/path/to/transcript.jsonl",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "SessionStart",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "source": "startup"
+    },
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "turn_id": "01a0dfca-4366-7d23-8000-57156a98a27b",
+      "transcript_path": "/path/to/transcript.jsonl",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "UserPromptSubmit",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "prompt": "Run npm test, then fix the failing test in cart.js (fix the code, not the test), then run npm test again."
+    }
+  ]
+}

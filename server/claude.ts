@@ -44,65 +44,130 @@ function stableId(parts: unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
 }
 
+export type Agent = 'claude' | 'codex' | 'gemini';
+export const AGENT_LABEL: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
+
+/** A failing run of a supported check, recognized from its output (for agents that don't report exit codes). */
+export function looksFailing(check: string, output: string): boolean {
+  if (check === 'npm run typecheck') return /error TS\d+/.test(output);
+  return /# fail [1-9]\d*/.test(output) || /Tests\s+.*\d+ failed/.test(output) || /Tests:.*\d+ failed/.test(output)
+    || /npm (ERR!|error) /.test(output);
+}
+
 /**
- * Normalizes a Claude Code hook payload (as forwarded by scripts/claude-hook.mjs)
- * into a PetEvent. Returns null for anything Byte does not track.
+ * A shell command as a Byte event. `failed` is the agent's own verdict when it has one
+ * (Claude's failure hook, Gemini's exit code); Codex reports only the output text, so
+ * for supported checks the verdict comes from the output, and other commands count as ok.
+ */
+function commandEvent(command: string, output: string, failed: boolean | null): { kind: EventKind; extra: Partial<PetEvent> } {
+  const check = canonicalCheck(command);
+  const failedNow = failed ?? (check ? looksFailing(check, output) : false);
+  const extra: Partial<PetEvent> = { command: scrub(head(command, 200)), outputExcerpt: scrub(tail(output)) };
+  if (check) {
+    extra.check = check;
+    extra.checkPassed = !failedNow && looksPassing(check, output);
+  }
+  return { kind: failedNow ? 'command_failed' : 'command_ok', extra };
+}
+
+type Translated = { kind: EventKind; extra: Partial<PetEvent>; turnId: string | null } | null;
+
+function claudeEvent(raw: Raw, hook: string): Translated {
+  const toolName = str(raw.tool_name);
+  const toolInput = obj(raw.tool_input);
+  const toolResponse = obj(raw.tool_response);
+  const turnId = str(raw.prompt_id) ?? null;
+  const done = (kind: EventKind, extra: Partial<PetEvent> = {}) => ({ kind, extra, turnId });
+  if (hook === 'SessionStart') return done('session_start');
+  if (hook === 'UserPromptSubmit') return done('prompt', { promptExcerpt: scrub(head(str(raw.prompt) ?? '')) });
+  if (hook === 'Stop') return done('stop');
+  if (hook === 'Notification') return done('notify', { message: scrub(head(str(raw.message) ?? '', 160)) });
+  if (hook !== 'PostToolUse' && hook !== 'PostToolUseFailure') return null;
+  if (!toolName) return null;
+  if (READ_TOOLS.has(toolName)) return done('read');
+  if (EDIT_TOOLS.has(toolName)) return hook === 'PostToolUseFailure' ? null : done('edit'); // a failed edit is not an edit
+  if (toolName !== 'Bash') return null;
+  const failed = hook === 'PostToolUseFailure' || toolResponse.interrupted === true;
+  // Success output lives in tool_response.stdout/stderr; failure output in `error`.
+  const output = failed ? str(raw.error) ?? '' : [str(toolResponse.stdout), str(toolResponse.stderr)].filter(Boolean).join('\n');
+  const { kind, extra } = commandEvent(str(toolInput.command) ?? '', output, failed);
+  return done(kind, extra);
+}
+
+/** Codex CLI: Claude-style hooks with turn_id; Bash output is a plain string with no exit code. */
+function codexEvent(raw: Raw, hook: string): Translated {
+  const turnId = str(raw.turn_id) ?? null;
+  const done = (kind: EventKind, extra: Partial<PetEvent> = {}) => ({ kind, extra, turnId });
+  const toolInput = obj(raw.tool_input);
+  const response = str(raw.tool_response) ?? '';
+  if (hook === 'SessionStart') return done('session_start');
+  if (hook === 'UserPromptSubmit') return done('prompt', { promptExcerpt: scrub(head(str(raw.prompt) ?? '')) });
+  if (hook === 'Stop') return done('stop');
+  if (hook === 'PermissionRequest') {
+    const cmd = str(toolInput.command);
+    return done('notify', { message: scrub(head(`Codex needs your permission${cmd ? ` to run: ${cmd}` : ''}`, 160)) });
+  }
+  if (hook !== 'PostToolUse') return null;
+  const toolName = str(raw.tool_name);
+  if (toolName === 'apply_patch') return /^(error|failed)|failed to apply|verification failed/i.test(response) ? null : done('edit');
+  if (toolName !== 'Bash') return null;
+  const { kind, extra } = commandEvent(str(toolInput.command) ?? '', response, null);
+  return done(kind, extra);
+}
+
+const GEMINI_READ = new Set(['read_file', 'read_many_files', 'glob', 'search_file_content', 'grep', 'list_directory']);
+const GEMINI_EDIT = new Set(['replace', 'write_file']);
+
+/** Gemini CLI: no turn ids (Byte starts a turn at each prompt); shell results carry "Exit Code: N". */
+function geminiEvent(raw: Raw, hook: string): Translated {
+  const hookTs = typeof raw.hook_ts === 'number' ? raw.hook_ts : Date.now();
+  const done = (kind: EventKind, extra: Partial<PetEvent> = {}, turnId: string | null = null) => ({ kind, extra, turnId });
+  const toolInput = obj(raw.tool_input);
+  const toolResponse = obj(raw.tool_response);
+  if (hook === 'SessionStart') return done('session_start');
+  if (hook === 'BeforeAgent') return done('prompt', { promptExcerpt: scrub(head(str(raw.prompt) ?? '')) }, `gemini:${str(raw.session_id)}:${hookTs}`);
+  if (hook === 'AfterAgent') return done('stop');
+  if (hook === 'Notification') return done('notify', { message: scrub(head(str(raw.message) ?? '', 160)) });
+  if (hook !== 'AfterTool') return null;
+  const toolName = str(raw.tool_name) ?? '';
+  const error = str(toolResponse.error);
+  if (GEMINI_READ.has(toolName)) return done('read');
+  if (GEMINI_EDIT.has(toolName)) return error ? null : done('edit');
+  if (toolName !== 'run_shell_command') return null;
+  const output = str(toolResponse.llmContent) ?? '';
+  const code = /Exit Code:\s*(-?\d+)/.exec(output);
+  const failed = error ? true : code ? Number(code[1]) !== 0 : null;
+  const { kind, extra } = commandEvent(str(toolInput.command) ?? '', output, failed);
+  return done(kind, extra);
+}
+
+/**
+ * Normalizes a coding-agent hook payload (as forwarded by scripts/byte-hook.mjs,
+ * tagged with `agent`) into a PetEvent. Returns null for anything Byte does not track.
  */
 export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null {
   const raw = obj(input);
   const sessionId = str(raw.session_id);
   const hook = str(raw.hook_event_name);
   if (!sessionId || !hook) return null;
-  const turnId = str(raw.prompt_id) ?? null;
-  const toolName = str(raw.tool_name);
+  const agent: Agent = raw.agent === 'codex' || raw.agent === 'gemini' ? raw.agent : 'claude';
+  const t = agent === 'codex' ? codexEvent(raw, hook) : agent === 'gemini' ? geminiEvent(raw, hook) : claudeEvent(raw, hook);
+  if (!t) return null;
+  const { kind, extra, turnId } = t;
   const toolUseId = str(raw.tool_use_id);
   const toolInput = obj(raw.tool_input);
-  const toolResponse = obj(raw.tool_response);
 
-  let kind: EventKind;
-  const extra: Partial<PetEvent> = {};
-
-  if (hook === 'SessionStart') kind = 'session_start';
-  else if (hook === 'UserPromptSubmit') {
-    kind = 'prompt';
-    extra.promptExcerpt = scrub(head(str(raw.prompt) ?? ''));
-  } else if (hook === 'Stop') kind = 'stop';
-  else if (hook === 'Notification') {
-    kind = 'notify';
-    extra.message = scrub(head(str(raw.message) ?? '', 160));
-  }
-  else if (hook === 'PostToolUse' || hook === 'PostToolUseFailure') {
-    if (!toolName) return null;
-    if (READ_TOOLS.has(toolName)) kind = 'read';
-    else if (EDIT_TOOLS.has(toolName)) {
-      if (hook === 'PostToolUseFailure') return null; // a failed edit is not an edit
-      kind = 'edit';
-    } else if (toolName === 'Bash') {
-      const command = str(toolInput.command) ?? '';
-      const failed = hook === 'PostToolUseFailure' || toolResponse.interrupted === true;
-      // Success output lives in tool_response.stdout/stderr; failure output in `error`.
-      const output = failed
-        ? str(raw.error) ?? ''
-        : [str(toolResponse.stdout), str(toolResponse.stderr)].filter(Boolean).join('\n');
-      kind = failed ? 'command_failed' : 'command_ok';
-      extra.command = scrub(head(command, 200));
-      extra.outputExcerpt = scrub(tail(output));
-      const check = canonicalCheck(command);
-      if (check) {
-        extra.check = check;
-        extra.checkPassed = !failed && looksPassing(check, output);
-      }
-    } else return null;
-  } else return null;
-
-  // Tool events carry tool_use_id. Notifications are separate occurrences even with the same
-  // text, so their id includes the hook time; a repeated delivery of one is dropped by the reducer.
+  // Tool events carry tool_use_id (Claude, Codex). Notifications, and Gemini's id-less events,
+  // are separate occurrences even with the same content, so their id includes the hook time;
+  // a repeated delivery of one notification is dropped by the reducer.
   const id = toolUseId
     ? `${sessionId}:${toolUseId}:${kind}`
     : kind === 'notify'
       ? `${sessionId}:notify:${stableId([turnId, raw.message, raw.notification_type, raw.hook_ts])}`
-      : `${sessionId}:${kind}:${stableId([turnId, raw.prompt, raw.source, raw.last_assistant_message, toolInput])}`;
-  // hook_ts is stamped by the hook when Claude Code runs it, so ordering survives async delivery.
+      : agent === 'gemini'
+        ? `${sessionId}:${kind}:${stableId([raw.prompt, toolInput, raw.tool_name, raw.hook_ts])}`
+        : `${sessionId}:${kind}:${stableId([turnId, raw.prompt, raw.source, raw.last_assistant_message, toolInput])}`;
+  // hook_ts is stamped by the hook when the agent runs it, so ordering survives async delivery.
   const timestamp = typeof raw.hook_ts === 'number' && Number.isFinite(raw.hook_ts) ? raw.hook_ts : now;
-  return { id, sessionId, turnId, timestamp, kind, ...extra };
+  return { id, sessionId, turnId, timestamp, kind, agent, ...extra };
 }

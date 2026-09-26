@@ -14,6 +14,7 @@ if (overlay) {
 const SLEEP_AFTER_MS = 90_000;
 const HOLD_MS = 3000;
 const REACTION_MS = 2500;
+const AGENT_NAME = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' } as const;
 /** Overlay bubble: stays up this long after its text changes, then hides unless it needs attention. */
 const BUBBLE_MS = 6000;
 const THRESHOLDS: Record<Stage, [number, number | null, string | null]> = {
@@ -165,7 +166,7 @@ function render() {
   el.caption.textContent = now < petCaptionUntil ? CAPTIONS.pet
     : reacting ? s.caption
     : s.status.tone === 'idle' && shown === 'sleeping' ? 'Zzz… (no activity for a bit)'
-    : s.status.text;
+    : s.activeAgent && s.status.tone !== 'idle' ? `${AGENT_NAME[s.activeAgent]} · ${s.status.text}` : s.status.text;
   }
 
   el.stageMini.textContent = replaying ? `Demo · ${el.stage.textContent}` : el.stage.textContent;

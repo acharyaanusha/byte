@@ -186,11 +186,14 @@ export function reduceEvent(state: PetState, event: PetEvent): { state: PetState
   s = {
     ...s,
     activeSessionId: s.activeSessionId ?? event.sessionId,
+    activeAgent: event.agent ?? s.activeAgent,
     seenEventIds: bounded(s.seenEventIds, event.id, MAX_IDS),
     lastEventAt: Math.max(s.lastEventAt, event.timestamp),
   };
 
-  const t = event.turnId;
+  // Agents without per-event turn ids (Gemini) belong to the current turn.
+  const t = event.turnId ?? (event.kind !== 'prompt' && event.kind !== 'session_start' ? s.currentTurnEvidence?.turnId ?? null : null);
+  if (t !== event.turnId) event = { ...event, turnId: t };
   let ev = s.currentTurnEvidence;
   if (t && ev?.turnId !== t && !s.pastTurnIds.includes(t) && event.kind !== 'session_start') {
     // A new turn: opened by its prompt, or by a tool event that beat the prompt here.

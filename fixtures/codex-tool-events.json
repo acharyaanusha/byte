@@ -1,0 +1,61 @@
+{
+  "_note": "Codex tool events built from the openai/codex source (hooks/src/schema post-tool-use.command.input; unified_exec: tool_name 'Bash', tool_response = model-visible output string with no exit code; ApplyPatchToolOutput: tool_response = text). Not yet captured from a live run.",
+  "events": [
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "turn_id": "01a0dfca-4366-7d23-8000-57156a98a27b",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "PostToolUse",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "transcript_path": null,
+      "tool_name": "Bash",
+      "tool_use_id": "call_fail1",
+      "tool_input": {
+        "command": "npm test"
+      },
+      "tool_response": "\n> byte-demo@1.0.0 test\n> node --test\n\nnot ok 1 - subtotal multiplies price by quantity\n# tests 2\n# pass 1\n# fail 1\n"
+    },
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "turn_id": "01a0dfca-4366-7d23-8000-57156a98a27b",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "PostToolUse",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "transcript_path": null,
+      "tool_name": "apply_patch",
+      "tool_use_id": "call_patch1",
+      "tool_input": {
+        "command": "*** Begin Patch\n*** Update File: cart.js\n...\n*** End Patch"
+      },
+      "tool_response": "Success. Updated the following files:\nM cart.js\n"
+    },
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "turn_id": "01a0dfca-4366-7d23-8000-57156a98a27b",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "PostToolUse",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "transcript_path": null,
+      "tool_name": "Bash",
+      "tool_use_id": "call_pass1",
+      "tool_input": {
+        "command": "npm test"
+      },
+      "tool_response": "\n> byte-demo@1.0.0 test\n> node --test\n\nok 1 - subtotal multiplies price by quantity\n# tests 2\n# pass 2\n# fail 0\n"
+    },
+    {
+      "session_id": "01a0dfca-428d-7912-b33e-5cbd4b8363ad",
+      "turn_id": "01a0dfca-4366-7d23-8000-57156a98a27b",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "Stop",
+      "model": "gpt-6-astra",
+      "permission_mode": "default",
+      "transcript_path": null,
+      "stop_hook_active": false,
+      "last_assistant_message": "Fixed subtotal."
+    }
+  ]
+}

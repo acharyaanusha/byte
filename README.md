@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="128" alt="Byte logo"></p>
+
 # Byte
 
 **Your coding companion grows with every little breakthrough.**
@@ -5,7 +7,7 @@
 <img src="public/pet/frames/hatchling-idle.png" width="150" alt="Byte, hatchling"> <img src="public/pet/frames/sprout-walk1.png" width="150" alt="Byte, sprout, walking"> <img src="public/pet/frames/companion-jump.png" width="150" alt="Byte, companion, celebrating">
 
 Byte is a small pixel-art dragon that floats in an always-on-top overlay above your terminal or coding app, or in a browser window beside it. It watches your
-Claude Code session through hooks and grows when you and your agent hit real coding
+coding agent through its hooks (**Claude Code, Codex CLI, or Gemini CLI**) and grows when you and your agent hit real coding
 milestones, such as fixing a failing test.
 
 - **Passive.** Claude Code hooks forward small event summaries to a local server. The agent never has to call a pet tool, and the hooks never block or steer it.
@@ -19,10 +21,20 @@ milestones, such as fixing a failing test.
 
 Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn earns at most one milestone. You never lose XP.
 
+## Supported agents
+
+| Agent | Hooks Byte uses | Notes |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json`: SessionStart, UserPromptSubmit, PostToolUse(Failure), Stop, Notification (async) | Verified with real sessions |
+| Codex CLI | `~/.codex/hooks.json`: SessionStart, UserPromptSubmit, PostToolUse (Bash, apply_patch), PermissionRequest, Stop | Codex reports command output but no exit code, so pass/fail of supported checks is read from the test output. Session and prompt events verified live (0.155.1); tool events follow the Codex source |
+| Gemini CLI | `~/.gemini/settings.json`: SessionStart, BeforeAgent, AfterTool, AfterAgent, Notification | Built from the official hooks reference; not yet verified with a live run. Gemini has no turn ids, so each prompt starts a turn |
+
+Byte follows one session at a time, whichever agent you last prompted. From source: `npm run install-hooks -- --global --agent codex` (or `gemini`, `claude`).
+
 ## How it works
 
 ```
-Claude Code ──hooks──▶ scripts/claude-hook.mjs ──POST /events (300 ms, fail-open)──▶ server (127.0.0.1:4317)
+agent ──hooks──▶ scripts/byte-hook.mjs ──POST /events (300 ms, fail-open)──▶ server (127.0.0.1:4317)
                                                                                      │  reduceEvent: behavior + turn evidence
                                                                                      │  debounce 2 s, 1 in flight, ≤ 1 call / 10 s
                                                                                      ▼
@@ -44,12 +56,12 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Byte-0.1.2-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+1. Download **Byte-0.2.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
 2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
-3. Byte asks to **connect to Claude Code**. It adds small async hooks to `~/.claude/settings.json` and keeps a backup. Start a new Claude Code session and Byte follows it.
+3. Byte finds the coding agents on your Mac (Claude Code, Codex, Gemini CLI) and asks to **connect** to them. It adds small hooks to each agent's settings and keeps a backup. Start a new session and Byte follows it. Codex asks you to trust new hooks the first time; approve Byte's.
 That's it: **no API key needed.** Byte asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Byte → **Use my own Jev API key…** to call Jev directly instead.
 
-Byte runs locally: the app hosts Byte's server on `127.0.0.1:4317` and keeps your pet in `~/.byte/pet.json` (and your own key, if you add one, in `~/.byte/config.json`, readable only by you). The hooks run with the app's own runtime, so you don't need Node. To disconnect, use right-click → **Disconnect Claude Code**.
+Byte runs locally: the app hosts Byte's server on `127.0.0.1:4317` and keeps your pet in `~/.byte/pet.json` (and your own key, if you add one, in `~/.byte/config.json`, readable only by you). The hooks run with the app's own runtime, so you don't need Node. To connect or disconnect an agent later, right-click Byte.
 
 ### The shared Jev service
 

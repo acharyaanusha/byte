@@ -1,0 +1,95 @@
+{
+  "_note": "Gemini CLI events built from the official hooks reference (geminicli.com/docs/hooks/reference). Not yet captured from a live run.",
+  "events": [
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "SessionStart",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1000,
+      "source": "startup"
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "BeforeAgent",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1100,
+      "prompt": "Fix the failing test in cart.js"
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "AfterTool",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1200,
+      "tool_name": "run_shell_command",
+      "tool_input": {
+        "command": "npm test"
+      },
+      "tool_response": {
+        "llmContent": "Command: npm test\nDirectory: (root)\nOutput: # tests 2\n# pass 1\n# fail 1\nError: (none)\nExit Code: 1",
+        "returnDisplay": "...",
+        "error": null
+      }
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "AfterTool",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1300,
+      "tool_name": "read_file",
+      "tool_input": {
+        "absolute_path": "/path/to/byte-demo/cart.js"
+      },
+      "tool_response": {
+        "llmContent": "...",
+        "returnDisplay": "",
+        "error": null
+      }
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "AfterTool",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1400,
+      "tool_name": "replace",
+      "tool_input": {
+        "file_path": "/path/to/byte-demo/cart.js"
+      },
+      "tool_response": {
+        "llmContent": "Successfully modified file",
+        "returnDisplay": "",
+        "error": null
+      }
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "AfterTool",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1500,
+      "tool_name": "run_shell_command",
+      "tool_input": {
+        "command": "npm test"
+      },
+      "tool_response": {
+        "llmContent": "Command: npm test\nDirectory: (root)\nOutput: # tests 2\n# pass 2\n# fail 0\nError: (none)\nExit Code: 0",
+        "returnDisplay": "...",
+        "error": null
+      }
+    },
+    {
+      "session_id": "gem-1",
+      "cwd": "/path/to/byte-demo",
+      "hook_event_name": "AfterAgent",
+      "timestamp": "2026-09-26T15:00:00Z",
+      "hook_ts": 1600,
+      "prompt": "Fix the failing test in cart.js",
+      "prompt_response": "Fixed.",
+      "stop_hook_active": false
+    }
+  ]
+}

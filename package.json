@@ -1,6 +1,6 @@
 {
   "name": "byte",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Byte: a coding tamagotchi that grows with every little breakthrough.",
@@ -38,10 +38,12 @@
       "electron/main.cjs",
       "electron/preload.cjs",
       "electron/backend.cjs",
-      "scripts/claude-hook.mjs",
-      "package.json"
+      "package.json",
+      "scripts/byte-hook.mjs",
+      "scripts/claude-hook.mjs"
     ],
     "asarUnpack": [
+      "scripts/byte-hook.mjs",
       "scripts/claude-hook.mjs"
     ],
     "directories": {

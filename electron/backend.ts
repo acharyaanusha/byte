@@ -4,13 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createByte, resolveProxy } from '../server/index.js';
-import { isByteHook, mergeHooks } from '../scripts/install-hooks.mjs';
+import { AGENTS, hookTarget, isByteHook, writeHooks } from '../scripts/install-hooks.mjs';
 
 export { createByte, resolveProxy };
 
 export const BYTE_HOME = path.join(os.homedir(), '.byte');
 const CONFIG = path.join(BYTE_HOME, 'config.json');
-const CLAUDE_SETTINGS = path.join(os.homedir(), '.claude', 'settings.json');
 
 export interface Config { typesafeApiKey?: string; askedToConnect?: boolean }
 
@@ -23,42 +22,36 @@ export function writeConfig(next: Config) {
   fs.writeFileSync(CONFIG, JSON.stringify(next, null, 2), { mode: 0o600 });
 }
 
-function readSettings(): { settings: Record<string, unknown>; original: string | null } {
-  if (!fs.existsSync(CLAUDE_SETTINGS)) return { settings: {}, original: null };
-  const original = fs.readFileSync(CLAUDE_SETTINGS, 'utf8');
-  return { settings: JSON.parse(original), original }; // throws on invalid JSON: caller reports, file untouched
+export type AgentId = 'claude' | 'codex' | 'gemini';
+export const AGENT_IDS: AgentId[] = ['claude', 'codex', 'gemini'];
+export const agentLabel = (a: AgentId) => AGENTS[a].label;
+
+/** Is this agent installed on this machine (its config folder exists)? */
+export function agentPresent(agent: AgentId): boolean {
+  return fs.existsSync(path.join(os.homedir(), AGENTS[agent].dir));
 }
 
-export function hooksInstalled(): boolean {
+export function hooksInstalled(agent: AgentId): boolean {
   try {
-    const hooks = (readSettings().settings.hooks ?? {}) as Record<string, { hooks?: unknown[] }[]>;
+    const target = hookTarget(agent);
+    if (!fs.existsSync(target)) return false;
+    const hooks = (JSON.parse(fs.readFileSync(target, 'utf8')).hooks ?? {}) as Record<string, { hooks?: unknown[] }[]>;
     return Object.values(hooks).some((groups) => groups.some((g) => (g.hooks ?? []).some(isByteHook)));
   } catch { return false; }
 }
 
 /**
- * Connects (or disconnects) Byte to every Claude Code session: copies the hook script to
- * ~/.byte and merges Byte's async hooks into ~/.claude/settings.json, keeping a backup.
- * The hook runs with this app's own Node runtime, so no separate Node install is needed.
+ * Connects (or disconnects) Byte to every session of one coding agent: copies the hook
+ * script to ~/.byte and merges Byte's hooks into that agent's global config, keeping a
+ * backup. The hook runs with this app's own Node runtime, so no separate Node install is needed.
+ * Throws, leaving the file untouched, if the agent's config isn't valid JSON.
  */
-export function setClaudeHooks(connect: boolean, hookSource: string, runtime: string): string {
-  const { settings, original } = readSettings();
-  const hookPath = path.join(BYTE_HOME, 'claude-hook.mjs');
+export function setAgentHooks(agent: AgentId, connect: boolean, hookSource: string, runtime: string): string {
+  const hookPath = path.join(BYTE_HOME, 'byte-hook.mjs');
   if (connect) {
     fs.mkdirSync(BYTE_HOME, { recursive: true });
     fs.copyFileSync(hookSource, hookPath);
   }
-  const command = `ELECTRON_RUN_AS_NODE=1 ${JSON.stringify(runtime)} ${JSON.stringify(hookPath)}`;
-  const next = mergeHooks(settings, { remove: !connect, hookPath, command });
-  const out = JSON.stringify(next, null, 2) + '\n';
-  if (out === original) return 'Already up to date.';
-  fs.mkdirSync(path.dirname(CLAUDE_SETTINGS), { recursive: true });
-  let note = '';
-  if (original !== null) {
-    const backup = `${CLAUDE_SETTINGS}.byte-backup-${Date.now()}`;
-    fs.writeFileSync(backup, original);
-    note = ` Backup: ${backup}`;
-  }
-  fs.writeFileSync(CLAUDE_SETTINGS, out);
-  return (connect ? 'Connected to Claude Code.' : 'Disconnected from Claude Code.') + note;
+  const command = `ELECTRON_RUN_AS_NODE=1 ${JSON.stringify(runtime)} ${JSON.stringify(hookPath)} --agent ${agent}`;
+  return writeHooks(hookTarget(agent), { agent, remove: !connect, hookPath, command });
 }

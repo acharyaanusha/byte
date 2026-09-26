@@ -41,29 +41,69 @@ function startServer() {
   });
 }
 
-const hookSource = () => path.join(__dirname, '..', 'scripts', 'claude-hook.mjs').replace('app.asar', 'app.asar.unpacked');
+const hookSource = () => path.join(__dirname, '..', 'scripts', 'byte-hook.mjs').replace('app.asar', 'app.asar.unpacked');
 
-function setHooks(connect) {
-  try {
-    dialog.showMessageBox({ message: backend.setClaudeHooks(connect, hookSource(), process.execPath),
-      detail: connect ? 'New Claude Code sessions will show up in Byte. Already-running sessions may need a restart.' : '' });
-  } catch (err) {
-    dialog.showErrorBox('Byte could not update ~/.claude/settings.json', `${err.message}\n\nThe file was left untouched.`);
-  }
+const RESTART_NOTE = {
+  claude: 'New Claude Code sessions will show up in Byte.',
+  codex: 'Restart Codex. It asks you to trust new hooks before running them: approve Byte\'s.',
+  gemini: 'New Gemini CLI sessions will show up in Byte.',
+};
+
+/** Connects or disconnects agents; returns one line per agent. Never throws. */
+function setHooks(agents, connect) {
+  return agents.map((agent) => {
+    const label = backend.agentLabel(agent);
+    try {
+      backend.setAgentHooks(agent, connect, hookSource(), process.execPath);
+      return connect ? `${label}: connected. ${RESTART_NOTE[agent]}` : `${label}: disconnected.`;
+    } catch (err) {
+      return `${label}: could not update its config (${err.message}); left it untouched.`;
+    }
+  });
+}
+
+/**
+ * A small ordinary window instead of a native modal: macOS modals stall the main
+ * process, and Byte's server runs here, so hooks would time out while one is open.
+ * Resolves with the index of the clicked button (-1 if closed).
+ */
+function ask(message, detail, buttons = ['OK']) {
+  return new Promise((resolve) => {
+    const w = new BrowserWindow({
+      width: 440, height: 240, resizable: false, minimizable: false, title: 'Byte', alwaysOnTop: true,
+      webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true },
+    });
+    const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+    const html = `<!doctype html><meta charset="utf-8"><title>Byte</title>
+<body style="font:14px -apple-system,system-ui;margin:18px;color:#2c3a36;background:#fbf5e6">
+<p style="font-weight:700;margin:0 0 8px">${esc(message)}</p>
+<p style="white-space:pre-line;margin:0 0 14px;color:#5d6b66">${esc(detail)}</p>
+<p style="text-align:right;margin:0">${buttons.map((b, i) => `<button data-i="${i}" style="margin-left:8px;padding:7px 14px;border-radius:8px;border:0;font-weight:600;${i === 0 ? 'background:#3e9d78;color:#fff' : 'background:#e6dcc2;color:#2c3a36'}">${esc(b)}</button>`).join('')}</p>
+<script>document.querySelectorAll('button').forEach((b)=>b.onclick=()=>window.byteHost.answer(Number(b.dataset.i)));</script>`;
+    let done = false;
+    const finish = (i) => { if (!done) { done = true; resolve(i); if (!w.isDestroyed()) w.close(); } };
+    const onAnswer = (e, i) => { if (e.sender === w.webContents) { ipcMain.removeListener('byte:answer', onAnswer); finish(i); } };
+    ipcMain.on('byte:answer', onAnswer);
+    w.on('closed', () => { ipcMain.removeListener('byte:answer', onAnswer); finish(-1); });
+    w.setMenu(null);
+    w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  });
+}
+
+function showResult(lines) {
+  void ask('Byte', lines.join('\n\n'));
 }
 
 async function firstRun() {
   const config = backend.readConfig();
-  if (config.askedToConnect || backend.hooksInstalled()) return;
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    buttons: ['Connect', 'Not now'],
-    defaultId: 0,
-    message: 'Connect Byte to Claude Code?',
-    detail: 'Byte adds small async hooks to ~/.claude/settings.json (a backup is kept) so it can react to your Claude Code sessions. They never block or change what Claude does. You can disconnect from the right-click menu at any time.',
-  });
+  const found = backend.AGENT_IDS.filter((a) => backend.agentPresent(a) && !backend.hooksInstalled(a));
+  if (config.askedToConnect || found.length === 0) return;
+  const names = found.map(backend.agentLabel).join(', ');
   backend.writeConfig({ ...backend.readConfig(), askedToConnect: true });
-  if (response === 0) setHooks(true);
+  const response = await ask(`Connect Byte to ${names}?`,
+    'Byte adds small hooks to each agent\'s settings (a backup is kept) so it can react to your coding sessions. They never block or change what the agent does. You can connect or disconnect each agent from the right-click menu at any time.',
+    ['Connect', 'Not now']);
+  if (response === 0) showResult(setHooks(found, true));
 }
 
 function keyWindow() {
@@ -105,17 +145,21 @@ function create() {
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadURL(`${UI}?overlay=1`);
   win.webContents.on('context-menu', () => {
+    const agentItems = backend ? backend.AGENT_IDS.filter(backend.agentPresent).map((agent) => {
+      const label = backend.agentLabel(agent);
+      return backend.hooksInstalled(agent)
+        ? { label: `Disconnect ${label}`, click: () => showResult(setHooks([agent], false)) }
+        : { label: `Connect ${label}`, click: () => showResult(setHooks([agent], true)) };
+    }) : [];
     const appItems = backend ? [
       { type: 'separator' },
-      backend.hooksInstalled()
-        ? { label: 'Disconnect Claude Code (remove hooks)', click: () => setHooks(false) }
-        : { label: 'Connect Claude Code (install hooks)', click: () => setHooks(true) },
+      ...agentItems,
       { label: 'Use my own Jev API key…', click: keyWindow },
     ] : [];
     Menu.buildFromTemplate([
       { label: 'Open full view', click: () => shell.openExternal(UI) },
       { label: 'Replay demo / exit demo', click: () => win.webContents.send('byte:command', 'replay') },
-      { label: 'Stop following this Claude session', click: () => win.webContents.send('byte:command', 'disconnect') },
+      { label: 'Stop following this session', click: () => win.webContents.send('byte:command', 'disconnect') },
       ...appItems,
       { type: 'separator' },
       { label: 'Quit Byte', click: () => app.quit() },
@@ -163,9 +207,9 @@ app.whenReady().then(async () => {
       app.quit();
       return;
     }
-    await firstRun();
   }
   create();
+  if (!DEV_UI) void firstRun();
 });
 app.on('window-all-closed', () => { if (!win || win.isDestroyed()) app.quit(); });
 app.on('before-quit', () => { void byte?.close(); });
