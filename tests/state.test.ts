@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyJudgment, initialState, jevEvents, needsYou, publicState, reduceEvent, sessionStatus, stageFor, TAKEOVER_MS } from '../server/state.js';
+import { applyJudgment, initialState, jevEvents, needsYou, publicState, reduceEvent, sessionStatus, setAppearance, stageFor, TAKEOVER_MS } from '../server/state.js';
 import { buildState } from '../server/jev.js';
 import { canonicalCheck, looksPassing, normalizeHook } from '../server/claude.js';
 import type { EventKind, PetEvent, PetJudgment, PetState } from '../shared/types.js';
@@ -329,5 +329,17 @@ describe('stale turns', () => {
     const s = run([ev('prompt', { timestamp: 1000 })]);
     expect(sessionStatus(s, 1000 + 60_000).text).toBe('Thinking about your prompt…');
     expect(sessionStatus(s, 1000 + 11 * 60_000)).toEqual({ tone: 'idle', text: 'Resting. Nothing from Claude for 11m.' });
+  });
+});
+
+describe('appearance', () => {
+  it('defaults to the mint dragon and accepts only known types and colors', () => {
+    const s = initialState();
+    expect(s.appearance).toEqual({ species: 'dragon', color: 'original' });
+    expect(setAppearance(s, { species: 'cat', color: 'sky' })?.appearance).toEqual({ species: 'cat', color: 'sky' });
+    expect(setAppearance(s, { species: 'unicorn', color: 'sky' })).toBeNull();
+    expect(setAppearance(s, { species: 'cat', color: '#ff0000' })).toBeNull();
+    expect(setAppearance(s, null)).toBeNull();
+    expect(publicState(setAppearance(s, { species: 'robot', color: 'gold' })!, 0).appearance).toEqual({ species: 'robot', color: 'gold' });
   });
 });

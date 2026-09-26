@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Byte: your coding companion grows with every little breakthrough." />
-    <link rel="icon" href="/pet/frames/hatchling-idle.png" />
+    <link rel="icon" href="/pet/dragon/hatchling-idle.png" />
     <title>Byte</title>
   </head>
   <body>
@@ -27,7 +27,7 @@
         <div class="hill"></div>
         <button class="pet" id="pet" data-behavior="idle" aria-label="Pet Byte">
           <span class="shadow"></span>
-          <span class="flip" id="flip"><img id="sprite" src="/pet/frames/hatchling-idle.png" alt="Byte the dragon" width="276" height="184" draggable="false" /></span>
+          <span class="flip" id="flip"><img id="sprite" src="/pet/dragon/hatchling-idle.png" alt="Byte the dragon" width="276" height="184" draggable="false" /></span>
           <span class="zzz" aria-hidden="true"><i>z</i><i>z</i><i>z</i></span>
           <span class="puzzle" aria-hidden="true">?</span>
         </button>
@@ -47,6 +47,11 @@
       <section class="milestones">
         <h2>Milestones</h2>
         <ol id="milestones"><li class="empty">None yet. Fix a failing test to feed Byte.</li></ol>
+      </section>
+
+      <section class="customize" aria-label="Customize Byte">
+        <label>Pet <select id="species"></select></label>
+        <label>Color <select id="color"></select></label>
       </section>
 
       <details class="details" id="details">

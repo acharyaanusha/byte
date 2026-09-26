@@ -1,5 +1,7 @@
 // Pure pet state logic: no I/O, so the browser replay can reuse it.
+import { COLORS, SPECIES } from '../shared/types.js';
 import type {
+  Appearance,
   Behavior, MilestoneChoice, MilestoneKind, PetEvent, PetJudgment, PetState, Stage, TurnEvidence,
 } from '../shared/types.js';
 
@@ -39,6 +41,7 @@ export function initialState(): PetState {
     activeSessionId: null, otherSessionAt: 0, connection: 'waiting',
     milestoneHistory: [], awardedTurnIds: [], seenEventIds: [],
     currentTurnEvidence: null, pastTurnIds: [], lastJudgment: null, needsYou: null, lastNotify: null,
+    appearance: { species: 'dragon', color: 'original' },
   };
 }
 
@@ -373,3 +376,10 @@ export function publicState(state: PetState, now: number) {
   };
 }
 export type PublicState = ReturnType<typeof publicState>;
+
+/** Validates and applies a new appearance; returns null if the request isn't a known type/color. */
+export function setAppearance(state: PetState, input: unknown): PetState | null {
+  const a = input as Partial<Appearance> | null;
+  if (!a || !SPECIES.includes(a.species as never) || !(String(a.color) in COLORS)) return null;
+  return { ...state, appearance: { species: a.species!, color: a.color! } };
+}

@@ -4,7 +4,7 @@
 
 **Your coding companion grows with every little breakthrough.**
 
-<img src="public/pet/frames/hatchling-idle.png" width="150" alt="Byte, hatchling"> <img src="public/pet/frames/sprout-walk1.png" width="150" alt="Byte, sprout, walking"> <img src="public/pet/frames/companion-jump.png" width="150" alt="Byte, companion, celebrating">
+<img src="public/pet/dragon/hatchling-idle.png" width="150" alt="Byte, hatchling"> <img src="public/pet/dragon/sprout-walk1.png" width="150" alt="Byte, sprout, walking"> <img src="public/pet/dragon/companion-jump.png" width="150" alt="Byte, companion, celebrating">
 
 Byte is a small pixel-art dragon that floats in an always-on-top overlay above your terminal or coding app, or in a browser window beside it. It watches your
 coding agent through its hooks (**Claude Code, Codex CLI, or Gemini CLI**) and grows when you and your agent hit real coding
@@ -20,6 +20,12 @@ milestones, such as fixing a failing test.
 | Recovered from failure | 20 | A check fails, then an edit, then **the same** check passes |
 
 Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn earns at most one milestone. You never lose XP.
+
+## Make it yours
+
+Pick a **pet type** (mint dragon, fire dragon, wizard cat, robot) and a **color** (original, mint, sky, lavender, rose, ember, gold). In the overlay, right-click Byte → **Pet** / **Color**; in the full view, use the selectors. Your choice is saved with your pet. Every type has the same three growth stages and the same animations. Colors recolor only the main body hue, so eyes, bellies and accents stay as drawn (for the robot, the color changes its glow).
+
+The art for each type was generated in Byte's pixel style by `scripts/gen-species.mjs`.
 
 ## Supported agents
 
@@ -56,7 +62,7 @@ browser (Vite, polls /api/state every second) ◀── .byte/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Byte-0.2.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
+1. Download **Byte-0.3.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/byte/releases/latest) and drag Byte to Applications.
 2. The app isn't notarized yet. On first launch, right-click Byte → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Byte.app`.
 3. Byte finds the coding agents on your Mac (Claude Code, Codex, Gemini CLI) and asks to **connect** to them. It adds small hooks to each agent's settings and keeps a backup. Start a new session and Byte follows it. Codex asks you to trust new hooks the first time; approve Byte's.
 That's it: **no API key needed.** Byte asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Byte → **Use my own Jev API key…** to call Jev directly instead.

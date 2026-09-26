@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeHook } from './claude.js';
 import { DEFAULT_PROXY_URL, judge } from './jev.js';
 import { JudgeScheduler } from './scheduler.js';
-import { applyJudgment, disconnect, initialState, markDegraded, publicState, reduceEvent } from './state.js';
+import { applyJudgment, disconnect, initialState, markDegraded, publicState, reduceEvent, setAppearance } from './state.js';
 import { loadState, Store } from './store.js';
 import type { PetJudgment, PetState } from '../shared/types.js';
 
@@ -83,6 +83,18 @@ export function createByte(opts: ByteOptions) {
     const url = (req.url ?? '/').replace(/^\/api/, '');
     if (req.method === 'GET' && url === '/state') return send(200, publicState(state, Date.now()));
     if (req.method === 'POST' && url === '/disconnect') { set(disconnect(state)); return send(200, { ok: true }); }
+    if (req.method === 'POST' && url === '/appearance') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 1024) req.destroy(); });
+      req.on('end', () => {
+        let next: PetState | null = null;
+        try { next = setAppearance(state, JSON.parse(body)); } catch { /* bad json */ }
+        if (!next) return send(400, { error: 'unknown species or color' });
+        set(next);
+        send(200, { appearance: next.appearance });
+      });
+      return;
+    }
     if (req.method === 'POST' && url === '/events') {
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > MAX_BODY) req.destroy(); });

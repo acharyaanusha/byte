@@ -1,7 +1,8 @@
 import './style.css';
 import { CAPTIONS, publicState } from '../server/state.js';
 import type { PublicState } from '../server/state.js';
-import type { Behavior, MilestoneRecord, PetState, Stage } from '../shared/types.js';
+import { COLORS, SPECIES, SPECIES_LABEL } from '../shared/types.js';
+import type { Appearance, Behavior, ColorName, MilestoneRecord, PetState, Species, Stage } from '../shared/types.js';
 import { startReplay } from './replay.js';
 import { PetAnimator } from './pet.js';
 
@@ -31,6 +32,7 @@ const el = {
   milestones: $('milestones'), details: $('details-body'), hearts: $('hearts'), flash: $('flash'),
   replay: $<HTMLButtonElement>('replay'), disconnect: $<HTMLButtonElement>('disconnect'),
   demoBanner: $('demo-banner'), otherBanner: $('other-banner'), stageMini: $('stage-mini'), flip: $('flip'), connMini: $('conn-mini'),
+  species: $<HTMLSelectElement>('species'), color: $<HTMLSelectElement>('color'),
 };
 
 const pageStart = Date.now();
@@ -133,6 +135,12 @@ function render() {
   el.conn.title = conn === 'degraded' ? 'Jev unavailable: Byte still reacts, but awards no XP.' : '';
   el.otherBanner.hidden = replaying || !s.otherSessionAt || now - s.otherSessionAt > 15_000;
 
+  // Appearance (the demo replay keeps whatever you picked)
+  const look = s.appearance ?? { species: 'dragon', color: 'original' };
+  animator.setAppearance(look.species, look.color);
+  if (document.activeElement !== el.species) el.species.value = look.species;
+  if (document.activeElement !== el.color) el.color.value = look.color;
+
   // Stage + growth flash
   if (shownStage !== s.stage) {
     animator.setStage(s.stage);
@@ -234,7 +242,22 @@ function toggleReplay() {
   render();
 }
 el.replay.addEventListener('click', toggleReplay);
+// Customize: type and color are saved with the pet on the server.
+for (const sp of SPECIES) el.species.add(new Option(SPECIES_LABEL[sp], sp));
+for (const c of Object.keys(COLORS)) el.color.add(new Option(c[0].toUpperCase() + c.slice(1), c));
+async function saveAppearance(next: Partial<Appearance>) {
+  const cur = latest?.appearance ?? { species: 'dragon' as Species, color: 'original' as ColorName };
+  const body = { ...cur, ...next };
+  if (latest) latest = { ...latest, appearance: body };
+  render();
+  try { await fetch('/api/appearance', { method: 'POST', body: JSON.stringify(body) }); } catch { /* offline: kept locally until the next poll */ }
+}
+el.species.addEventListener('change', () => void saveAppearance({ species: el.species.value as Species }));
+el.color.addEventListener('change', () => void saveAppearance({ color: el.color.value as ColorName }));
+
 window.byteHost?.onCommand?.((cmd) => {
+  if (cmd.startsWith('species:')) void saveAppearance({ species: cmd.slice(8) as Species });
+  if (cmd.startsWith('color:')) void saveAppearance({ color: cmd.slice(6) as ColorName });
   if (cmd === 'replay') toggleReplay();
   if (cmd === 'disconnect') el.disconnect.click();
 });

@@ -156,7 +156,15 @@ function create() {
       ...agentItems,
       { label: 'Use my own Jev API key…', click: keyWindow },
     ] : [];
+    const send = (cmd) => () => win.webContents.send('byte:command', cmd);
+    const petMenu = [['dragon', 'Mint dragon'], ['fire', 'Fire dragon'], ['cat', 'Wizard cat'], ['robot', 'Robot']]
+      .map(([id, label]) => ({ label, click: send(`species:${id}`) }));
+    const colorMenu = ['original', 'mint', 'sky', 'lavender', 'rose', 'ember', 'gold']
+      .map((c) => ({ label: c[0].toUpperCase() + c.slice(1), click: send(`color:${c}`) }));
     Menu.buildFromTemplate([
+      { label: 'Pet', submenu: petMenu },
+      { label: 'Color', submenu: colorMenu },
+      { type: 'separator' },
       { label: 'Open full view', click: () => shell.openExternal(UI) },
       { label: 'Replay demo / exit demo', click: () => win.webContents.send('byte:command', 'replay') },
       { label: 'Stop following this session', click: () => win.webContents.send('byte:command', 'disconnect') },

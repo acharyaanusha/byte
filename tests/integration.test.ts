@@ -90,6 +90,20 @@ describe('superseded same-turn judgments (server)', () => {
   });
 });
 
+describe('appearance endpoint', () => {
+  it('saves a valid choice with the pet and rejects unknown ones', async () => {
+    const statePath = path.join(tmp(), 'pet.json');
+    const b = byte(async () => { throw new Error('unused'); }, statePath);
+    await new Promise<void>((r) => b.server.listen(0, '127.0.0.1', r));
+    const port = (b.server.address() as { port: number }).port;
+    const post = (body: unknown) => fetch(`http://127.0.0.1:${port}/api/appearance`, { method: 'POST', body: JSON.stringify(body) });
+    expect((await post({ species: 'fire', color: 'rose' })).status).toBe(200);
+    expect((await post({ species: 'dinosaur', color: 'rose' })).status).toBe(400);
+    await b.flush();
+    expect(JSON.parse(fs.readFileSync(statePath, 'utf8')).appearance).toEqual({ species: 'fire', color: 'rose' });
+  });
+});
+
 describe('scheduler', () => {
   it('debounces, single-flights, and still evaluates the final queued event', async () => {
     vi.useFakeTimers();

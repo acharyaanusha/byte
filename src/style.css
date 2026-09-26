@@ -150,6 +150,12 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
   .pet[data-behavior='sleeping'] .zzz i { opacity: .8; }
 }
 
+/* Customize row (full view only) */
+.customize { display: flex; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
+.customize label { display: flex; align-items: center; gap: 6px; flex: 1; }
+.customize select { flex: 1; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; }
+html.overlay .customize { display: none; }
+
 /* Overlay mode (?overlay): a small Byte, a thin XP bar, and a speech bubble that only shows when
    something changes, when Claude needs you or looks stuck, or on hover. Keep the footprint small. */
 html.overlay, html.overlay body { background: transparent; }
