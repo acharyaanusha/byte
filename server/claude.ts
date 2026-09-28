@@ -59,10 +59,14 @@ export function looksFailing(check: string, output: string): boolean {
  * (Claude's failure hook, Gemini's exit code); Codex reports only the output text, so
  * for supported checks the verdict comes from the output, and other commands count as ok.
  */
+/** Commands that skip or disable checks. */
+const BYPASS = /--no-verify\b|\bgit\s+commit\b[^|;&]*\s-n\b|\bHUSKY=0\b|--no-lint\b|--skip-checks?\b/;
+
 function commandEvent(command: string, output: string, failed: boolean | null): { kind: EventKind; extra: Partial<PetEvent> } {
   const check = canonicalCheck(command);
   const failedNow = failed ?? (check ? looksFailing(check, output) : false);
   const extra: Partial<PetEvent> = { command: scrub(head(command, 200)), outputExcerpt: scrub(tail(output)) };
+  if (BYPASS.test(command)) extra.bypass = true;
   if (check) {
     extra.check = check;
     extra.checkPassed = !failedNow && looksPassing(check, output);
@@ -154,6 +158,13 @@ export function normalizeHook(input: unknown, now = Date.now()): PetEvent | null
   const t = agent === 'codex' ? codexEvent(raw, hook) : agent === 'gemini' ? geminiEvent(raw, hook) : claudeEvent(raw, hook);
   if (!t) return null;
   const { kind, extra, turnId } = t;
+  if (kind === 'edit') {
+    const f = obj(raw.edit_flags);
+    extra.edit = {
+      testFile: f.testFile === true, skipAdded: f.skipAdded === true, silencerAdded: f.silencerAdded === true,
+      assertsRemoved: typeof f.assertsRemoved === 'number' && f.assertsRemoved > 0 ? Math.min(99, Math.floor(f.assertsRemoved)) : 0,
+    };
+  }
   const toolUseId = str(raw.tool_use_id);
   const toolInput = obj(raw.tool_input);
 

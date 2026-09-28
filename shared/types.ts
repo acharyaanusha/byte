@@ -17,19 +17,31 @@ export interface PetEvent {
   checkPassed?: boolean;
   outputExcerpt?: string;
   promptExcerpt?: string;
+  /** Edit quality flags computed locally by the hook (never the code itself). */
+  edit?: EditFlags;
+  /** A command that bypasses checks (--no-verify and the like). */
+  bypass?: boolean;
   /** Claude Code's Notification text, e.g. "Claude needs your permission to use Bash". */
   message?: string;
 }
 
+export interface EditFlags { testFile: boolean; skipAdded: boolean; assertsRemoved: number; silencerAdded: boolean }
+
 export type Activity = 'exploring' | 'implementing' | 'checking' | 'blocked' | 'resting';
 export type MilestoneKind = 'recovered_from_failure' | 'verified_progress';
 export type MilestoneChoice = MilestoneKind | 'none';
+/** Slop that costs XP. */
+export type SlopKind = 'cheated_tests' | 'silenced_checks' | 'unverified_changes';
+export type SlopChoice = SlopKind | 'none';
 
 export interface PetJudgment {
   activity: Activity;
   milestone: MilestoneChoice;
   milestoneProbability: number;
   needsAttention: number;
+  /** Jev's read on slop in this turn (absent from older proxies: treated as none). */
+  slop?: SlopChoice;
+  slopProbability?: number;
   latencyMs?: number;
 }
 
@@ -48,6 +60,8 @@ export interface TurnEvidence {
   verifiedCheck: string | null;
   /** Ids of the events that prove the milestone (failure, edit, pass), kept for Jev even when older than the last 12. */
   trailIds: string[];
+  /** Slop evidence: a check "passed" by weakening its test, silenced checks, edits never verified. */
+  slop: { cheatedCheck: string | null; onlyTestsChanged: boolean; silenced: boolean; unverified: boolean; ids: string[] };
   /** Failures since the last success, per check or command: the loop detector. */
   failStreaks: Record<string, number>;
   edits: number;
@@ -59,7 +73,8 @@ export type Connection = 'live' | 'degraded' | 'waiting';
 
 export interface MilestoneRecord {
   turnId: string;
-  kind: MilestoneKind;
+  /** A milestone (+XP) or a slop penalty (−XP). */
+  kind: MilestoneKind | SlopKind;
   xp: number;
   at: number;
   check: string;
@@ -73,6 +88,10 @@ export interface PetState {
   caption: string;
   /** Celebration stays on screen until this time. */
   celebrateUntil: number;
+  /** After a slop penalty the pet looks upset until this time. */
+  sadUntil: number;
+  /** Turns already penalized (at most one penalty per turn). Bounded. */
+  penalizedTurnIds: string[];
   grewAt: number;
   lastEventAt: number;
   activeSessionId: string | null;

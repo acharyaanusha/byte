@@ -30,11 +30,18 @@ export const SCRIPT: Step[] = [
   { wait: 3000, event: e('edit', 'demo-3') },
   { wait: 1800, event: pass('demo-3') },
   decide('demo-3', 'recovered_from_failure', 0.91), // +20 → companion
+  // Slop: the agent "fixes" a failing test by skipping it. −15, but the companion stage is kept.
+  { wait: 5000, event: e('prompt', 'demo-4', { promptExcerpt: 'Just make the tests pass' }) },
+  { wait: 1400, event: fail('demo-4') },
+  { wait: 2200, event: e('edit', 'demo-4', { edit: { testFile: true, skipAdded: true, assertsRemoved: 1, silencerAdded: false } }) },
+  { wait: 1800, event: pass('demo-4') },
+  { wait: 1600, turnId: 'demo-4', judgment: { activity: 'checking', milestone: 'none', milestoneProbability: 0.9, needsAttention: 0.05, slop: 'cheated_tests', slopProbability: 0.93, latencyMs: 0 } },
 ];
 
 /** Runs the script, calling onState after every step. Returns a stop function. */
-export function startReplay(onState: (s: PetState) => void, onDone: () => void): () => void {
-  let state: PetState = { ...initialState(), connection: 'live' };
+export function startReplay(onState: (s: PetState) => void, onDone: () => void, appearance?: PetState['appearance']): () => void {
+  // The demo keeps your chosen pet and color.
+  let state: PetState = { ...initialState(), connection: 'live', ...(appearance ? { appearance } : {}) };
   let i = 0;
   let timer: ReturnType<typeof setTimeout>;
   let n = 0;

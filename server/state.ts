@@ -1,7 +1,7 @@
 // Pure pet state logic: no I/O, so the browser replay can reuse it.
 import { COLORS, SPECIES } from '../shared/types.js';
 import type {
-  Appearance,
+  Appearance, SlopKind,
   Behavior, MilestoneChoice, MilestoneKind, PetEvent, PetJudgment, PetState, Stage, TurnEvidence,
 } from '../shared/types.js';
 
@@ -28,6 +28,14 @@ export const CAPTIONS = {
   pet: 'Hehe.',
 } as const;
 
+const STAGE_ORDER: Stage[] = ['hatchling', 'sprout', 'companion'];
+
+export const SLOP_CAPTION: Record<SlopKind, (xp: number) => string> = {
+  cheated_tests: (xp) => `That test was weakened, not fixed.${xp ? ` −${xp} XP` : ''}`,
+  silenced_checks: (xp) => `Silencing the checks?${xp ? ` −${xp} XP` : ''}`,
+  unverified_changes: (xp) => `Changes nobody checked.${xp ? ` −${xp} XP` : ''}`,
+};
+
 export function stageFor(xp: number): Stage {
   if (xp >= 50) return 'companion';
   if (xp >= 20) return 'sprout';
@@ -37,7 +45,7 @@ export function stageFor(xp: number): Stage {
 export function initialState(): PetState {
   return {
     xp: 0, stage: 'hatchling', behavior: 'idle', caption: CAPTIONS.hello,
-    celebrateUntil: 0, grewAt: 0, lastEventAt: 0,
+    celebrateUntil: 0, sadUntil: 0, penalizedTurnIds: [], grewAt: 0, lastEventAt: 0,
     activeSessionId: null, otherSessionAt: 0, connection: 'waiting',
     milestoneHistory: [], awardedTurnIds: [], seenEventIds: [],
     currentTurnEvidence: null, pastTurnIds: [], lastJudgment: null, needsYou: null, lastNotify: null,
@@ -53,6 +61,7 @@ export function newEvidence(turnId: string, promptExcerpt = ''): TurnEvidence {
   return {
     turnId, promptExcerpt, events: [], version: 0, failed: {}, editSinceLastPass: false, sawEdit: false,
     recoveredCheck: null, verifiedCheck: null, trailIds: [], failStreaks: {}, edits: 0,
+    slop: { cheatedCheck: null, onlyTestsChanged: false, silenced: false, unverified: false, ids: [] },
   };
 }
 
@@ -68,50 +77,75 @@ export function newEvidence(turnId: string, promptExcerpt = ''): TurnEvidence {
  * A later pass after an edit can re-establish it. XP already awarded is never taken back.
  */
 export function deriveEvidence(ev: TurnEvidence): TurnEvidence {
-  // Per check: its latest run, and the failure → edit that can make a later pass a recovery.
+  // Per check: its latest run, and the failure → edits that can make a later pass a recovery.
   const lastRun: Record<string, 'pass' | 'fail'> = {};
-  const failPending: Record<string, { failId: string; editId?: string }> = {};
-  const recoverable: Record<string, { failId: string; editId: string }> = {};
+  const failPending: Record<string, { failId: string; edits: PetEvent[] }> = {};
+  const recoverable: Record<string, { failId: string; edits: PetEvent[] }> = {};
   let success: { check: string; kind: 'recovered' | 'verified'; trail: string[] } | null = null;
-  let editSinceLastPass = false, sawEdit = false, lastEditId = '';
+  let editSinceLastPass = false, sawEdit = false;
+  let editsSincePass: PetEvent[] = [];
   const failStreaks: Record<string, number> = {};
-  let edits = 0;
+  let edits = 0, checksRun = 0, editSinceLastCheck = false;
+  // Slop evidence.
+  let cheatedCheck: string | null = null, onlyTestsChanged = false;
+  const slopIds: string[] = [];
+  let silenced = false;
+  const weakening = (e: PetEvent) => !!e.edit?.testFile && (e.edit.skipAdded || e.edit.assertsRemoved > 0);
   for (const e of ev.events) {
     const key = e.check ?? e.command;
     if (key && e.kind === 'command_failed') failStreaks[key] = (failStreaks[key] ?? 0) + 1;
     if (key && e.kind === 'command_ok') delete failStreaks[key];
+    if (e.edit?.silencerAdded || e.bypass) { silenced = true; slopIds.push(e.id); }
+    if (e.check && (e.kind === 'command_ok' || e.kind === 'command_failed')) { checksRun++; editSinceLastCheck = false; }
     if (e.kind === 'edit') {
       edits++;
-      sawEdit = true; editSinceLastPass = true; lastEditId = e.id;
-      for (const f of Object.values(failPending)) f.editId ??= e.id;
+      sawEdit = true; editSinceLastPass = true; editSinceLastCheck = true;
+      editsSincePass.push(e);
+      for (const f of Object.values(failPending)) f.edits.push(e);
       success = null; // code changed after it was checked
     } else if (e.kind === 'command_failed' && e.check) {
       lastRun[e.check] = 'fail';
-      failPending[e.check] = { failId: e.id };
+      failPending[e.check] = { failId: e.id, edits: [] };
       if (success?.check === e.check) success = null;
     } else if (e.kind === 'command_ok' && e.check && e.checkPassed) {
       lastRun[e.check] = 'pass';
       const f = failPending[e.check];
-      if (f?.editId) recoverable[e.check] = { failId: f.failId, editId: f.editId };
+      if (f && f.edits.length) recoverable[e.check] = { failId: f.failId, edits: [...f.edits] };
       delete failPending[e.check];
       const r = recoverable[e.check];
-      if (r) success = { check: e.check, kind: 'recovered', trail: [r.failId, r.editId, e.id] };
-      else if (editSinceLastPass) success = { check: e.check, kind: 'verified', trail: [lastEditId, e.id] };
+      // The edits that made this pass happen: since the failure (recovery) or since the last pass (verified).
+      const window = r ? r.edits : editsSincePass;
+      const weakened = window.filter(weakening);
+      if (weakened.length) {
+        // Passing by skipping tests or deleting assertions: no award, and it's slop.
+        cheatedCheck = e.check;
+        slopIds.push(...weakened.map((w) => w.id), e.id);
+        success = null;
+      } else if (window.length && window.every((w) => w.edit?.testFile)) {
+        // Only the test changed. Sometimes the test really was wrong: no award, no penalty.
+        onlyTestsChanged = true;
+        success = null;
+      } else if (r) success = { check: e.check, kind: 'recovered', trail: [r.failId, r.edits[r.edits.length - 1].id, e.id] };
+      else if (editSinceLastPass) success = { check: e.check, kind: 'verified', trail: [editsSincePass[editsSincePass.length - 1].id, e.id] };
       editSinceLastPass = false;
+      editsSincePass = [];
     }
   }
   const failing = Object.keys(lastRun).filter((k) => lastRun[k] === 'fail');
   if (failing.length) success = null; // an unresolved failure overrides any success
-  const failed = Object.fromEntries(failing.map((k) => [k, { editedSince: !!failPending[k]?.editId }]));
+  const failed = Object.fromEntries(failing.map((k) => [k, { editedSince: (failPending[k]?.edits.length ?? 0) > 0 }]));
+  const ended = ev.events[ev.events.length - 1]?.kind === 'stop';
+  // Unverified: the turn ended with edits no check ran after, or 15+ edits and no check at all.
+  const unverified = ended && edits > 0 && (editSinceLastCheck || (edits >= 15 && checksRun === 0));
   return {
     ...ev, failed, editSinceLastPass, sawEdit,
     recoveredCheck: success?.kind === 'recovered' ? success.check : null,
     verifiedCheck: success?.kind === 'verified' ? success.check : null,
     trailIds: success?.trail ?? [],
+    slop: { cheatedCheck, onlyTestsChanged, silenced, unverified, ids: [...new Set(slopIds)] },
     failStreaks, edits,
   };
 }
-
 const RELEVANT = new Set(['edit', 'command_failed', 'command_ok']);
 
 /** Inserts an event in hook-time order and re-derives the evidence. */
@@ -133,11 +167,24 @@ export function eligibleMilestones(ev: TurnEvidence | null): MilestoneKind[] {
   return [];
 }
 
+/** Which slop penalties the local evidence supports. */
+export function eligibleSlop(ev: TurnEvidence | null): SlopKind[] {
+  if (!ev?.slop) return [];
+  const out: SlopKind[] = [];
+  if (ev.slop.cheatedCheck) out.push('cheated_tests');
+  if (ev.slop.silenced) out.push('silenced_checks');
+  if (ev.slop.unverified) out.push('unverified_changes');
+  return out;
+}
+
+export const PENALTY: Record<SlopKind, number> = { cheated_tests: 15, silenced_checks: 10, unverified_changes: 5 };
+
 /** What Jev sees: the milestone trail (even if older) plus the last 12 events. */
 export function jevEvents(ev: TurnEvidence): { trail: PetEvent[]; recent: PetEvent[] } {
   const recent = ev.events.slice(-MAX_RECENT);
   const recentIds = new Set(recent.map((e) => e.id));
-  const trail = ev.events.filter((e) => ev.trailIds.includes(e.id) && !recentIds.has(e.id));
+  const keep = new Set([...ev.trailIds, ...(ev.slop?.ids ?? [])]);
+  const trail = ev.events.filter((e) => keep.has(e.id) && !recentIds.has(e.id));
   return { trail, recent };
 }
 
@@ -239,11 +286,36 @@ const ACTIVITY_BEHAVIOR: Record<PetJudgment['activity'], Behavior> = {
  */
 export function applyJudgment(
   state: PetState, judgment: PetJudgment, turnId: string, now: number, evidenceVersion?: number,
-): { state: PetState; awarded: number; superseded?: boolean } {
+): { state: PetState; awarded: number; penalty?: number; superseded?: boolean } {
   const ev = state.currentTurnEvidence;
   if (!ev || ev.turnId !== turnId) return { state, awarded: 0, superseded: true };
   // Jev judged an older snapshot of this turn; a queued re-evaluation will judge the current one.
   if (evidenceVersion !== undefined && evidenceVersion !== ev.version) return { state, awarded: 0, superseded: true };
+
+  // Slop first: a penalty needs local evidence AND Jev (p >= 0.8), once per turn, and it
+  // cancels any award in the same turn. XP never drops below 0; the stage is never lost.
+  const slop = judgment.slop ?? 'none';
+  if (
+    slop !== 'none' &&
+    (judgment.slopProbability ?? 0) >= MIN_PROBABILITY &&
+    eligibleSlop(ev).includes(slop) &&
+    !(state.penalizedTurnIds ?? []).includes(turnId)
+  ) {
+    const lost = Math.min(PENALTY[slop], state.xp);
+    const check = slop === 'cheated_tests' ? ev.slop.cheatedCheck ?? '' : '';
+    const s: PetState = {
+      ...state,
+      connection: 'live',
+      lastJudgment: { ...judgment, turnId, at: now, awarded: false },
+      xp: state.xp - lost,
+      behavior: 'puzzled',
+      caption: SLOP_CAPTION[slop](lost),
+      sadUntil: now + CELEBRATE_MS,
+      penalizedTurnIds: bounded(state.penalizedTurnIds ?? [], turnId, MAX_IDS),
+      milestoneHistory: bounded(state.milestoneHistory, { turnId, kind: slop, xp: -lost, at: now, check, judgment }, MAX_HISTORY),
+    };
+    return { state: s, awarded: 0, penalty: lost };
+  }
 
   const choice: MilestoneChoice = judgment.milestone;
   const eligible =
@@ -265,7 +337,8 @@ export function applyJudgment(
 
   const kind = choice as MilestoneKind;
   const xp = s.xp + XP[kind];
-  const stage = stageFor(xp);
+  // A stage once earned is kept, even if penalties later pulled XP below its threshold.
+  const stage = STAGE_ORDER.indexOf(stageFor(xp)) > STAGE_ORDER.indexOf(s.stage) ? stageFor(xp) : s.stage;
   const grew = stage !== s.stage;
   s = {
     ...s,
@@ -333,6 +406,9 @@ export function sessionStatus(state: PetState, now: number): { tone: StatusTone;
   if (loop && !ended) return { tone: 'stuck', text: `Looping? “${loop[0]}” failed ${loop[1]}× in a row.` };
   if (judged && judged.needsAttention >= MIN_PROBABILITY) return { tone: 'waiting', text: 'Claude may be waiting on you.' };
   if (judged?.activity === 'blocked' && !ended) return { tone: 'stuck', text: 'Looks blocked. Might need a nudge.' };
+  if (ev.slop?.cheatedCheck) return { tone: 'stuck', text: `${ev.slop.cheatedCheck} "passed" because the test was weakened.` };
+  if (ev.slop?.silenced) return { tone: 'stuck', text: 'Checks were silenced (ts-ignore, eslint-disable or --no-verify).' };
+  if (ev.slop?.onlyTestsChanged && ended) return { tone: 'failing', text: 'Only the test changed, so this one doesn\'t count.' };
 
   if (ended) {
     if (ev.recoveredCheck) return { tone: 'done', text: `Done: fixed ${ev.recoveredCheck} and it passes ✓` };

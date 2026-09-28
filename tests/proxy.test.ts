@@ -22,8 +22,8 @@ describe('shared Jev proxy', () => {
     }) as typeof fetch;
     const res = await handleJudge(req({ state: 'summary', questions: { evil: {} } }), { apiKey: 'k', fetchImpl, allow: () => true });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.97, needsAttention: 0.04 });
-    expect(Object.keys(sent!.questions)).toEqual(['activity', 'milestone', 'needs_attention']); // caller's questions ignored
+    expect(await res.json()).toEqual({ activity: 'checking', milestone: 'recovered_from_failure', milestoneProbability: 0.97, needsAttention: 0.04, slop: 'none', slopProbability: 0 });
+    expect(Object.keys(sent!.questions)).toEqual(['activity', 'milestone', 'slop', 'needs_attention']); // caller's questions ignored
     expect(sent!.state).toBe('summary');
   });
 

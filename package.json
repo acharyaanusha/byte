@@ -1,6 +1,6 @@
 {
   "name": "pico",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Pico: a coding tamagotchi that grows with every little breakthrough.",
@@ -41,12 +41,14 @@
       "package.json",
       "scripts/pico-hook.mjs",
       "scripts/claude-hook.mjs",
-      "scripts/byte-hook.mjs"
+      "scripts/byte-hook.mjs",
+      "scripts/slop-flags.mjs"
     ],
     "asarUnpack": [
       "scripts/pico-hook.mjs",
       "scripts/byte-hook.mjs",
-      "scripts/claude-hook.mjs"
+      "scripts/claude-hook.mjs",
+      "scripts/slop-flags.mjs"
     ],
     "directories": {
       "output": "release"

@@ -57,12 +57,16 @@ export function hooksInstalled(agent: AgentId): boolean {
  * backup. The hook runs with this app's own Node runtime, so no separate Node install is needed.
  * Throws, leaving the file untouched, if the agent's config isn't valid JSON.
  */
+/** Copies the hook script and its local edit scanner next to each other in ~/.pico. */
+export function installHookFiles(hookSource: string) {
+  fs.mkdirSync(PICO_HOME, { recursive: true });
+  fs.copyFileSync(hookSource, path.join(PICO_HOME, 'pico-hook.mjs'));
+  fs.copyFileSync(path.join(path.dirname(hookSource), 'slop-flags.mjs'), path.join(PICO_HOME, 'slop-flags.mjs'));
+}
+
 export function setAgentHooks(agent: AgentId, connect: boolean, hookSource: string, runtime: string): string {
   const hookPath = path.join(PICO_HOME, 'pico-hook.mjs');
-  if (connect) {
-    fs.mkdirSync(PICO_HOME, { recursive: true });
-    fs.copyFileSync(hookSource, hookPath);
-  }
+  if (connect) installHookFiles(hookSource);
   const command = `ELECTRON_RUN_AS_NODE=1 ${JSON.stringify(runtime)} ${JSON.stringify(hookPath)} --agent ${agent}`;
   return writeHooks(hookTarget(agent), { agent, remove: !connect, hookPath, command });
 }

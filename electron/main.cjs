@@ -220,7 +220,11 @@ app.whenReady().then(async () => {
     }
   }
   create();
-  if (!DEV_UI) void firstRun();
+  if (!DEV_UI) {
+    // Keep installed hooks current with this version of the app.
+    if (backend.AGENT_IDS.some(backend.hooksInstalled)) { try { backend.installHookFiles(hookSource()); } catch { /* next connect will retry */ } }
+    void firstRun();
+  }
 });
 app.on('window-all-closed', () => { if (!win || win.isDestroyed()) app.quit(); });
 app.on('before-quit', () => { void pico?.close(); });

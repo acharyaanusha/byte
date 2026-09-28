@@ -4,6 +4,8 @@
 // Reads the hook JSON from stdin, keeps only a bounded subset, and POSTs it to the
 // local Pico server with a 300 ms timeout. It never writes to stdout, never blocks,
 // and always exits 0. The server does the per-agent translation (server/agents.ts).
+import { flagsForTool } from './slop-flags.mjs';
+
 const URL = process.env.PICO_URL ?? process.env.BYTE_URL ?? 'http://127.0.0.1:4317/events';
 // Stamped before anything else: async hooks may be delivered out of order, so the
 // server orders a turn's events by this time, not by arrival.
@@ -34,6 +36,8 @@ async function main() {
     prompt: cut(raw.prompt, 500),
     tool_name: raw.tool_name,
     tool_use_id: raw.tool_use_id,
+    // Edit quality flags are computed here, locally; the edit's code is never sent.
+    edit_flags: raw.tool_name ? flagsForTool(AGENT, raw.tool_name, ti) : undefined,
     tool_input: { command: cut(Array.isArray(ti.command) ? ti.command.join(' ') : ti.command, 500), file_path: cut(ti.file_path, 300) },
     // Claude: {stdout, stderr, interrupted}. Codex: a plain output string.
     // Gemini: {llmContent, returnDisplay, error}.

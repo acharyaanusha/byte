@@ -23,7 +23,10 @@ const THRESHOLDS: Record<Stage, [number, number | null, string | null]> = {
   sprout: [20, 50, 'companion'],
   companion: [50, null, null],
 };
-const MILESTONE_LABEL = { recovered_from_failure: 'Recovered from failure', verified_progress: 'Verified progress' };
+const MILESTONE_LABEL = {
+  recovered_from_failure: 'Recovered from failure', verified_progress: 'Verified progress',
+  cheated_tests: 'Weakened a test', silenced_checks: 'Silenced checks', unverified_changes: 'Unverified changes',
+};
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const el = {
@@ -56,6 +59,7 @@ const animator = new PetAnimator(el.pet, el.sprite, el.flip);
 
 function targetBehavior(s: PublicState, now: number): Behavior {
   if (now < s.celebrateUntil) return 'celebrating';
+  if (now < (s.sadUntil ?? 0)) return 'puzzled';
   const quietSince = Math.max(s.lastEventAt, pageStart);
   if (now - quietSince > SLEEP_AFTER_MS) return 'sleeping';
   return s.behavior === 'celebrating' ? 'idle' : s.behavior;
@@ -75,7 +79,7 @@ function escape(s: string) {
 function renderMilestones(list: MilestoneRecord[], now: number) {
   const last = list.slice(-3).reverse();
   el.milestones.innerHTML = last.length
-    ? last.map((m) => `<li><span class="pts">+${m.xp}</span><span>${MILESTONE_LABEL[m.kind]} · <code>${escape(m.check)}</code></span><span class="when">${ago(m.at, now)}</span></li>`).join('')
+    ? last.map((m) => `<li class="${m.xp < 0 ? 'penalty' : ''}"><span class="pts">${m.xp < 0 ? '−' + -m.xp : '+' + m.xp}</span><span>${MILESTONE_LABEL[m.kind]}${m.check ? ` · <code>${escape(m.check)}</code>` : ''}</span><span class="when">${ago(m.at, now)}</span></li>`).join('')
     : '<li class="empty">None yet. Fix a failing test to feed Pico.</li>';
 }
 
@@ -87,6 +91,7 @@ function renderDetails(s: PublicState, now: number) {
     rows.push(
       ['Activity', j.activity],
       ['Milestone', `${j.milestone} (p=${j.milestoneProbability.toFixed(2)})`],
+      ['Slop', `${j.slop ?? 'none'}${j.slopProbability !== undefined ? ` (p=${j.slopProbability.toFixed(2)})` : ''}`],
       ['Needs you', j.needsAttention.toFixed(2)],
       ['Awarded', j.awarded ? 'yes' : 'no'],
       ['Latency', j.latencyMs ? `${j.latencyMs} ms` : '—'],
@@ -167,7 +172,7 @@ function render() {
     el.caption.textContent = 'Pico server is offline. Start it with npm run dev.';
   } else {
   // Caption: a quick reaction right after something happens, otherwise how the session is going.
-  const reacting = now - s.lastEventAt < REACTION_MS || now < s.celebrateUntil;
+  const reacting = now - s.lastEventAt < REACTION_MS || now < s.celebrateUntil || now < (s.sadUntil ?? 0);
   const tone = now < petCaptionUntil || reacting ? 'reaction' : s.status.tone;
   el.caption.dataset.tone = tone;
   el.caption.textContent = now < petCaptionUntil ? CAPTIONS.pet
@@ -187,7 +192,8 @@ function render() {
 
   // XP
   const [lo, hi, nextStage] = THRESHOLDS[s.stage];
-  const pct = hi === null ? 100 : ((s.xp - lo) / (hi - lo)) * 100;
+  // Penalties can leave XP below the stage's start (the stage is kept): the bar just reads empty.
+  const pct = hi === null ? 100 : Math.max(0, ((s.xp - lo) / (hi - lo)) * 100);
   el.xp.textContent = `${s.xp} XP`;
   el.xpNext.textContent = hi === null ? 'Fully grown' : `${hi - s.xp} to ${nextStage}`;
   el.barFill.style.transform = `scaleX(${Math.min(100, pct) / 100})`;
@@ -237,7 +243,8 @@ function toggleReplay() {
   if (stopReplay) { exitReplay(); return; }
   replayGen++;
   shownStage = null; lastGrewAt = Date.now();
-  stopReplay = startReplay((s: PetState) => { latest = publicState(s, Date.now()); render(); }, exitReplay);
+  const look = latest?.appearance;
+  stopReplay = startReplay((s: PetState) => { latest = publicState(s, Date.now()); render(); }, exitReplay, look);
   render();
 }
 el.replay.addEventListener('click', toggleReplay);

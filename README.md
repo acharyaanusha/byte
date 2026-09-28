@@ -19,7 +19,17 @@ milestones, such as fixing a failing test.
 | Verified progress | 10 | An edit, then a supported check that passes |
 | Recovered from failure | 20 | A check fails, then an edit, then **the same** check passes |
 
-Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn earns at most one milestone. You never lose XP.
+Stages: hatchling (0–19 XP) → sprout (20–49) → companion (50+). A turn earns at most one milestone.
+
+**Slop costs XP.** Pico also watches for vibe-coded shortcuts:
+
+| Slop | XP | Evidence required in one turn |
+|---|---:|---|
+| Cheating the test | −15 | A failing test "passes" because the test file was edited to add `.skip` / `.only` / `xit` or to remove assertions |
+| Silencing checks | −10 | An edit adds `@ts-ignore`, `@ts-nocheck`, `eslint-disable`, `# type: ignore`, `# noqa`…, or a command uses `--no-verify` |
+| Unverified changes | −5 | The turn ends with edits no test or typecheck ran after, or 15+ edits with no check at all |
+
+Like awards, a penalty needs both the local evidence and Jev agreeing (p ≥ 0.8), at most once per turn. XP never goes below 0, and **a stage once earned is never lost**. If only the test file changed (without skips or removed assertions), the fix earns nothing but costs nothing either, because sometimes the test really was wrong. The hook scans each edit on your machine and sends only yes/no flags and counts, never your code.
 
 ## Make it yours
 
@@ -62,7 +72,7 @@ browser (Vite, polls /api/state every second) ◀── .pico/pet.json (atomic w
 
 ## Install (macOS, Apple Silicon)
 
-1. Download **Pico-0.4.1-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/pico/releases/latest) and drag Pico to Applications.
+1. Download **Pico-0.5.0-arm64.dmg** from the [latest release](https://github.com/acharyaanusha/pico/releases/latest) and drag Pico to Applications.
 2. The app isn't notarized yet. On first launch, right-click Pico → **Open** → **Open**. Or run `xattr -dr com.apple.quarantine /Applications/Pico.app`.
 3. Pico finds the coding agents on your Mac (Claude Code, Codex, Gemini CLI) and asks to **connect** to them. It adds small hooks to each agent's settings and keeps a backup. Start a new session and Pico follows it. Codex asks you to trust new hooks the first time; approve Pico's.
 That's it: **no API key needed.** Pico asks Jev through a shared service. If you have your own [TypeSafe](https://docs.typesafe.ai) key, right-click Pico → **Use my own Jev API key…** to call Jev directly instead.

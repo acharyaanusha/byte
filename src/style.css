@@ -128,6 +128,7 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
 .milestones ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .milestones li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
 .milestones li .pts { font-weight: 800; color: var(--mint-deep); min-width: 32px; }
+.milestones li.penalty .pts { color: #c4553f; }
 .milestones li .when { margin-left: auto; color: var(--ink-2); font-size: 12px; white-space: nowrap; }
 .milestones li code { font-size: 11.5px; background: var(--cream-2); padding: 0 4px; border-radius: 4px; }
 .milestones .empty { color: var(--ink-2); }

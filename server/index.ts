@@ -53,11 +53,11 @@ export function createPico(opts: PicoOptions) {
       set(markDegraded(state));
       return;
     }
-    const { state: next, awarded, superseded } = applyJudgment(state, judgment, turnId, Date.now(), version);
+    const { state: next, awarded, penalty, superseded } = applyJudgment(state, judgment, turnId, Date.now(), version);
     const stale = !!superseded;
     // Newer evidence arrived while Jev was thinking: judge the current snapshot next.
     if (stale && state.currentTurnEvidence?.turnId === turnId) scheduler.request();
-    log(`jev turn=${turnId} v${version} activity=${judgment.activity} milestone=${judgment.milestone} p=${judgment.milestoneProbability.toFixed(2)} attention=${judgment.needsAttention.toFixed(2)} ${judgment.latencyMs ?? '?'}ms awarded=${awarded}${stale ? ' (superseded, ignored)' : ''}`);
+    log(`jev turn=${turnId} v${version} activity=${judgment.activity} milestone=${judgment.milestone} p=${judgment.milestoneProbability.toFixed(2)} attention=${judgment.needsAttention.toFixed(2)} slop=${judgment.slop ?? 'none'}${judgment.slop && judgment.slop !== 'none' ? `(${(judgment.slopProbability ?? 0).toFixed(2)})` : ''} ${judgment.latencyMs ?? '?'}ms awarded=${awarded}${penalty ? ` penalty=-${penalty}` : ''}${stale ? ' (superseded, ignored)' : ''}`);
     set(next);
   }, opts.schedule);
 
